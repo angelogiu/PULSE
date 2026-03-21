@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PulseBridge — Hospital Command</title>
+<script src="https://cdn.jsdelivr.net/npm/socket.io-client@4.7.2/dist/socket.io.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0d0f14;
+    --bg2: #13161e;
+    --bg3: #1a1e28;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.13);
+    --text: #e8eaf0;
+    --text2: #8b91a5;
+    --text3: #555c70;
+    --critical: #ff4d4d;
+    --critical-bg: rgba(255,77,77,0.12);
+    --high: #ff8c00;
+    --high-bg: rgba(255,140,0,0.12);
+    --moderate: #f5c518;
+    --moderate-bg: rgba(245,197,24,0.12);
+    --low: #3ddc84;
+    --low-bg: rgba(61,220,132,0.1);
+    --info: #4da6ff;
+    --info-bg: rgba(77,166,255,0.1);
+    --pulse: #ff4d4d;
+    --font-mono: 'IBM Plex Mono', monospace;
+    --font-sans: 'DM Sans', sans-serif;
+  }
+  body { background: var(--bg); color: var(--text); font-family: var(--font-sans); font-size: 13px; min-height: 100vh; overflow-x: hidden; }
+
+  /* HEADER */
+  .header { display: flex; align-items: center; justify-content: space-between; padding: 0 24px; height: 52px; border-bottom: 1px solid var(--border); background: var(--bg2); position: sticky; top: 0; z-index: 100; }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-mark { width: 28px; height: 28px; position: relative; }
+  .logo-mark svg { width: 28px; height: 28px; }
+  .logo-text { font-family: var(--font-mono); font-weight: 500; font-size: 14px; letter-spacing: 0.08em; color: var(--text); }
+  .logo-sub { font-size: 10px; color: var(--text3); letter-spacing: 0.1em; text-transform: uppercase; margin-top: 1px; }
+  .header-right { display: flex; align-items: center; gap: 20px; }
+  .live-badge { display: flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 11px; color: var(--low); letter-spacing: 0.08em; }
+  .live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--low); animation: pulse-dot 2s infinite; }
+  @keyframes pulse-dot { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(1.3)} }
+  .clock { font-family: var(--font-mono); font-size: 13px; color: var(--text2); }
+  .hospital-name { font-size: 12px; color: var(--text3); }
+
+  /* METRICS STRIP */
+  .metrics { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1px; background: var(--border); border-bottom: 1px solid var(--border); }
+  .metric { background: var(--bg2); padding: 12px 20px; }
+  .metric-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text3); margin-bottom: 6px; }
+  .metric-value { font-family: var(--font-mono); font-size: 22px; font-weight: 500; }
+  .metric-value.critical { color: var(--critical); }
+  .metric-value.info { color: var(--info); }
+  .metric-value.ok { color: var(--low); }
+  .metric-value.warn { color: var(--high); }
+  .metric-sub { font-size: 10px; color: var(--text3); margin-top: 3px; }
+
+  /* MAIN LAYOUT */
+  .main { display: grid; grid-template-columns: 1fr 360px; height: calc(100vh - 52px - 58px); }
+
+  /* PATIENT BOARD */
+  .board { overflow-y: auto; border-right: 1px solid var(--border); }
+  .board-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--bg); z-index: 10; }
+  .board-title { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text2); }
+  .filter-row { display: flex; gap: 6px; }
+  .filter-btn { padding: 4px 10px; border-radius: 3px; border: 1px solid var(--border2); background: transparent; color: var(--text2); font-size: 11px; font-family: var(--font-sans); cursor: pointer; transition: all .15s; }
+  .filter-btn.active, .filter-btn:hover { background: var(--bg3); color: var(--text); border-color: var(--border2); }
+  .filter-btn.active { color: var(--info); border-color: var(--info-bg); }
+
+  .patient-card { display: grid; grid-template-columns: 6px 1fr; gap: 0; cursor: pointer; border-bottom: 1px solid var(--border); transition: background .1s; }
+  .patient-card:hover { background: var(--bg2); }
+  .patient-card.selected { background: var(--bg3); }
+  .severity-bar { border-radius: 0; }
+  .severity-bar.critical { background: var(--critical); }
+  .severity-bar.high { background: var(--high); }
+  .severity-bar.moderate { background: var(--moderate); }
+  .severity-bar.low { background: var(--low); }
+  .card-body { padding: 14px 18px; }
+  .card-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 8px; }
+  .card-id { font-family: var(--font-mono); font-size: 10px; color: var(--text3); }
+  .severity-badge { padding: 2px 8px; border-radius: 2px; font-size: 10px; font-family: var(--font-mono); font-weight: 500; letter-spacing: 0.05em; }
+  .severity-badge.critical { background: var(--critical-bg); color: var(--critical); }
+  .severity-badge.high { background: var(--high-bg); color: var(--high); }
+  .severity-badge.moderate { background: var(--moderate-bg); color: var(--moderate); }
+  .severity-badge.low { background: var(--low-bg); color: var(--low); }
+  .card-complaint { font-size: 14px; font-weight: 500; color: var(--text); margin-bottom: 6px; }
+  .card-meta { display: flex; gap: 16px; }
+  .card-meta-item { font-size: 11px; color: var(--text2); font-family: var(--font-mono); }
+  .card-meta-item span { color: var(--text3); }
+  .vitals-row { display: flex; gap: 12px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
+  .vital-chip { display: flex; align-items: center; gap: 4px; font-family: var(--font-mono); font-size: 11px; }
+  .vital-chip .vlabel { color: var(--text3); font-size: 9px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .vital-chip .vval { color: var(--text); }
+  .vital-chip.warn .vval { color: var(--high); }
+  .vital-chip.danger .vval { color: var(--critical); }
+  .eta-chip { margin-left: auto; font-family: var(--font-mono); font-size: 11px; }
+  .eta-chip .eta-val { color: var(--info); }
+  .eta-chip .eta-lbl { color: var(--text3); font-size: 9px; }
+  .new-flash { animation: new-in .6s ease-out; }
+  @keyframes new-in { from { background: rgba(77,166,255,0.15); } to { background: transparent; } }
+  .critical-pulse { animation: card-pulse 2s infinite; }
+  @keyframes card-pulse { 0%,100%{background:transparent} 50%{background:rgba(255,77,77,0.04)} }
+
+  /* DETAIL PANEL */
+  .detail { overflow-y: auto; background: var(--bg2); display: flex; flex-direction: column; }
+  .detail-header { padding: 16px 20px 12px; border-bottom: 1px solid var(--border); }
+  .detail-enc { font-family: var(--font-mono); font-size: 10px; color: var(--text3); margin-bottom: 4px; }
+  .detail-complaint { font-size: 18px; font-weight: 500; color: var(--text); margin-bottom: 8px; }
+  .detail-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+  .tag { padding: 3px 8px; border-radius: 2px; font-size: 11px; background: var(--bg3); color: var(--text2); border: 1px solid var(--border); }
+  .detail-section { padding: 14px 20px; border-bottom: 1px solid var(--border); }
+  .section-label { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text3); margin-bottom: 10px; }
+  .vitals-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .vital-box { background: var(--bg3); border-radius: 4px; padding: 10px 12px; }
+  .vital-box-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text3); margin-bottom: 4px; }
+  .vital-box-val { font-family: var(--font-mono); font-size: 18px; font-weight: 500; }
+  .vital-box-val.ok { color: var(--low); }
+  .vital-box-val.warn { color: var(--high); }
+  .vital-box-val.danger { color: var(--critical); }
+  .vital-box-unit { font-size: 10px; color: var(--text3); }
+  .demo-info { padding: 8px 12px; background: var(--bg3); border-radius: 3px; font-size: 12px; color: var(--text2); margin-bottom: 8px; }
+  .reco-list { display: flex; flex-direction: column; gap: 6px; }
+  .reco-item { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; background: var(--bg3); border-radius: 4px; border-left: 3px solid transparent; }
+  .reco-item.urgent { border-left-color: var(--critical); }
+  .reco-item.warn { border-left-color: var(--high); }
+  .reco-item.info { border-left-color: var(--info); }
+  .reco-icon { font-size: 14px; flex-shrink: 0; }
+  .reco-text { font-size: 12px; color: var(--text); line-height: 1.5; }
+  .reco-text strong { color: var(--text); font-weight: 500; display: block; font-size: 12px; }
+  .reco-text span { color: var(--text2); font-size: 11px; }
+
+  /* TIMELINE */
+  .timeline-list { display: flex; flex-direction: column; gap: 0; }
+  .tl-item { display: grid; grid-template-columns: 44px 1fr; gap: 0; padding: 10px 0; position: relative; }
+  .tl-item::before { content: ''; position: absolute; left: 21px; top: 28px; bottom: -8px; width: 1px; background: var(--border); }
+  .tl-item:last-child::before { display: none; }
+  .tl-time { font-family: var(--font-mono); font-size: 10px; color: var(--text3); padding-top: 2px; text-align: right; padding-right: 14px; }
+  .tl-dot-wrap { position: relative; display: flex; flex-direction: column; align-items: center; }
+  .tl-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 4px; flex-shrink: 0; }
+  .tl-dot.critical { background: var(--critical); }
+  .tl-dot.info { background: var(--info); }
+  .tl-dot.ok { background: var(--low); }
+  .tl-dot.warn { background: var(--high); }
+  .tl-dot.neutral { background: var(--text3); }
+  .tl-content { padding-left: 12px; }
+  .tl-event { font-size: 12px; color: var(--text); }
+  .tl-detail { font-size: 11px; color: var(--text2); margin-top: 2px; font-family: var(--font-mono); }
+
+  .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; padding: 40px; text-align: center; }
+  .empty-state p { color: var(--text3); font-size: 13px; margin-top: 12px; }
+
+  .ack-btn { display: block; width: calc(100% - 40px); margin: 16px 20px; padding: 10px; background: var(--bg3); border: 1px solid var(--border2); border-radius: 4px; color: var(--info); font-family: var(--font-mono); font-size: 12px; cursor: pointer; transition: all .15s; letter-spacing: 0.05em; }
+  .ack-btn:hover { background: var(--info-bg); border-color: rgba(77,166,255,0.3); }
+  .ack-btn.acked { color: var(--low); border-color: var(--low-bg); background: var(--low-bg); }
+  .ack-badge { display: inline-block; font-family: var(--font-mono); font-size: 10px; padding: 1px 6px; border-radius: 2px; vertical-align: middle; margin-left: 4px; }
+  .ack-badge.acked { background: var(--low-bg); color: var(--low); }
+  .ack-badge.pending { background: var(--high-bg); color: var(--high); }
+
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="logo">
+    <div class="logo-mark">
+      <svg viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="1" y="1" width="26" height="26" rx="4" stroke="#4da6ff" stroke-width="1.5"/>
+        <path d="M5 14h4l2.5-6 3 12 2.5-8 2 4H23" stroke="#ff4d4d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <div>
+      <div class="logo-text">PULSEBRIDGE</div>
+      <div class="logo-sub">ER Command Center</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="hospital-name">Vancouver General Hospital · ED Unit A</div>
+    <div class="live-badge"><div class="live-dot"></div>LIVE</div>
+    <div class="clock" id="clock">--:--:--</div>
+  </div>
+</div>
+
+<!-- METRICS -->
+<div class="metrics">
+  <div class="metric">
+    <div class="metric-label">Incoming</div>
+    <div class="metric-value info" id="m-incoming">5</div>
+    <div class="metric-sub">active transports</div>
+  </div>
+  <div class="metric">
+    <div class="metric-label">Critical</div>
+    <div class="metric-value critical" id="m-critical">2</div>
+    <div class="metric-sub">immediate intervention</div>
+  </div>
+  <div class="metric">
+    <div class="metric-label">Avg ETA</div>
+    <div class="metric-value warn" id="m-eta">7 min</div>
+    <div class="metric-sub">to arrival</div>
+  </div>
+  <div class="metric">
+    <div class="metric-label">Active Alerts</div>
+    <div class="metric-value critical" id="m-alerts">3</div>
+    <div class="metric-sub">require action</div>
+  </div>
+  <div class="metric">
+    <div class="metric-label">Bay Status</div>
+    <div class="metric-value ok">4 / 8</div>
+    <div class="metric-sub">bays available</div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+  <!-- LEFT: PATIENT BOARD -->
+  <div class="board">
+    <div class="board-header">
+      <div class="board-title">Incoming Patients</div>
+      <div class="filter-row">
+        <button class="filter-btn active" onclick="setFilter('all',this)">All</button>
+        <button class="filter-btn" onclick="setFilter('critical',this)">Critical</button>
+        <button class="filter-btn" onclick="setFilter('unacked',this)">Unacked</button>
+      </div>
+    </div>
+    <div id="patient-list"></div>
+  </div>
+
+  <!-- RIGHT: DETAIL PANEL -->
+  <div class="detail" id="detail-panel">
+    <div class="empty-state">
+      <svg width="40" height="40" viewBox="0 0 40 40" fill="none"><rect x="1" y="1" width="38" height="38" rx="6" stroke="#555c70" stroke-width="1.5"/><path d="M10 20h6l3-8 4 16 3-10 3 5h1" stroke="#555c70" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <p>Select a patient to view details</p>
+    </div>
+  </div>
+</div>
+
+<script>
+const patients = [
+  {
+    id: 'ENC-2847', ambulance: 'AMB-04', eta: 3,
+    age: 62, sex: 'M', complaint: 'Chest Pain / STEMI',
+    severity: 'critical', category: 'Cardiac',
+    conscious: true, breathing: 'labored',
+    vitals: { hr: 112, bp: '92/60', spo2: 91, rr: 22, temp: 37.2, gcs: 14 },
+    notes: 'Onset 45 min ago. Diaphoretic. Hx of MI 2019.',
+    symptoms: ['Chest Pain', 'Diaphoresis', 'SOB'],
+    acked: false,
+    actions: [
+      { type:'urgent', icon:'⚡', title:'Activate cath lab immediately', detail:'STEMI pattern on field ECG' },
+      { type:'urgent', icon:'🩸', title:'Prepare dual antiplatelet therapy', detail:'Aspirin + Ticagrelor' },
+      { type:'warn', icon:'🛏', title:'Trauma bay on standby', detail:'Patient may deteriorate en route' },
+      { type:'info', icon:'📋', title:'Cardiology consult required', detail:'Contact on-call cardiologist now' },
+    ],
+    timeline: [
+      { time:'09:42', event:'Intake received', detail:'ENC-2847 created by AMB-04', type:'info' },
+      { time:'09:43', event:'Risk scored: CRITICAL', detail:'STEMI indicators detected', type:'critical' },
+      { time:'09:44', event:'Cath lab alert sent', detail:'Auto-alert dispatched', type:'warn' },
+      { time:'09:45', event:'Vitals updated', detail:'HR 112, BP 92/60, SpO2 91%', type:'warn' },
+    ]
+  },
+  {
+    id: 'ENC-2846', ambulance: 'AMB-07', eta: 6,
+    age: 34, sex: 'F', complaint: 'MVA — Head Trauma',
+    severity: 'critical', category: 'Trauma',
+    conscious: false, breathing: 'assisted',
+    vitals: { hr: 98, bp: '140/88', spo2: 94, rr: 18, temp: 36.8, gcs: 8 },
+    notes: 'Unrestrained passenger. Loss of consciousness at scene ~3 min.',
+    symptoms: ['Head Trauma', 'Unconscious', 'Laceration'],
+    acked: false,
+    actions: [
+      { type:'urgent', icon:'🧠', title:'Prepare CT — head/C-spine', detail:'GCS 8, mechanism of injury high-risk' },
+      { type:'urgent', icon:'🚨', title:'Trauma team activation', detail:'Level 1 trauma criteria met' },
+      { type:'warn', icon:'🩺', title:'Neurosurgery on standby', detail:'Potential intracranial bleed' },
+      { type:'info', icon:'🩸', title:'Type & screen, large bore IV', detail:'2x 16G IVs en route' },
+    ],
+    timeline: [
+      { time:'09:38', event:'Intake received', detail:'ENC-2846 created by AMB-07', type:'info' },
+      { time:'09:39', event:'Risk scored: CRITICAL', detail:'Trauma + GCS < 10', type:'critical' },
+      { time:'09:40', event:'Trauma team alerted', detail:'Auto page sent', type:'warn' },
+      { time:'09:43', event:'GCS updated', detail:'GCS dropped from 10 → 8', type:'critical' },
+    ]
+  },
+  {
+    id: 'ENC-2845', ambulance: 'AMB-02', eta: 9,
+    age: 78, sex: 'F', complaint: 'Stroke Symptoms',
+    severity: 'high', category: 'Neuro',
+    conscious: true, breathing: 'normal',
+    vitals: { hr: 88, bp: '182/104', spo2: 97, rr: 16, temp: 36.9, gcs: 14 },
+    notes: 'FAST positive. L-sided facial droop, slurred speech ~35 min ago.',
+    symptoms: ['Facial Droop', 'Slurred Speech', 'Arm Weakness'],
+    acked: true,
+    actions: [
+      { type:'urgent', icon:'🧠', title:'Code stroke — CT angio NOW', detail:'Within tPA window (35 min onset)' },
+      { type:'warn', icon:'💊', title:'tPA eligibility assessment', detail:'BP 182/104 — borderline' },
+      { type:'info', icon:'📋', title:'Neurology consult', detail:'Stroke team paged' },
+    ],
+    timeline: [
+      { time:'09:22', event:'Intake received', detail:'ENC-2845 created by AMB-02', type:'info' },
+      { time:'09:23', event:'Risk scored: HIGH', detail:'FAST criteria positive', type:'warn' },
+      { time:'09:23', event:'Stroke protocol triggered', detail:'CT team notified', type:'warn' },
+      { time:'09:30', event:'Hospital acknowledged', detail:'Acked by Dr. Reyes', type:'ok' },
+    ]
+  },
+  {
+    id: 'ENC-2844', ambulance: 'AMB-09', eta: 14,
+    age: 45, sex: 'M', complaint: 'Respiratory Distress',
+    severity: 'high', category: 'Respiratory',
+    conscious: true, breathing: 'labored',
+    vitals: { hr: 104, bp: '128/80', spo2: 88, rr: 28, temp: 38.4, gcs: 15 },
+    notes: 'Hx of asthma. Salbutamol given x2 with partial response.',
+    symptoms: ['SOB', 'Wheeze', 'Accessory Muscle Use'],
+    acked: false,
+    actions: [
+      { type:'urgent', icon:'💨', title:'Respiratory support ready', detail:'SpO2 88% — possible intubation' },
+      { type:'warn', icon:'💊', title:'Prepare nebulized bronchodilators', detail:'Salbutamol partial response noted' },
+      { type:'info', icon:'🏥', title:'ICU bed on standby', detail:'Severe exacerbation criteria' },
+    ],
+    timeline: [
+      { time:'09:35', event:'Intake received', detail:'ENC-2844 by AMB-09', type:'info' },
+      { time:'09:36', event:'Risk scored: HIGH', detail:'SpO2 88%, RR 28', type:'warn' },
+      { time:'09:40', event:'Vitals updated', detail:'SpO2 stable at 88% on O2', type:'warn' },
+    ]
+  },
+  {
+    id: 'ENC-2843', ambulance: 'AMB-11', eta: 18,
+    age: 29, sex: 'M', complaint: 'Laceration — Forearm',
+    severity: 'moderate', category: 'Trauma',
+    conscious: true, breathing: 'normal',
+    vitals: { hr: 82, bp: '118/74', spo2: 99, rr: 14, temp: 36.7, gcs: 15 },
+    notes: 'Deep laceration requiring sutures. Bleeding controlled with tourniquet.',
+    symptoms: ['Laceration', 'Controlled Bleeding'],
+    acked: true,
+    actions: [
+      { type:'info', icon:'🧵', title:'Surgical consult for tendon check', detail:'Deep palmar laceration' },
+      { type:'info', icon:'💉', title:'Tetanus booster needed', detail:'Wound contamination present' },
+    ],
+    timeline: [
+      { time:'09:28', event:'Intake received', detail:'ENC-2843 by AMB-11', type:'info' },
+      { time:'09:29', event:'Risk scored: MODERATE', detail:'Vitals stable', type:'neutral' },
+      { time:'09:35', event:'Hospital acknowledged', detail:'Acked, bay 6 assigned', type:'ok' },
+    ]
+  },
+];
+
+let selectedId = null;
+let filterMode = 'all';
+let ackedMap = {};
+patients.forEach(p => ackedMap[p.id] = p.acked);
+
+function setFilter(mode, btn) {
+  filterMode = mode;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderList();
+}
+
+function severityOrder(s) { return {critical:0,high:1,moderate:2,low:3}[s] ?? 4; }
+
+function renderList() {
+  const list = document.getElementById('patient-list');
+  let filtered = [...patients].sort((a,b) => severityOrder(a.severity) - severityOrder(b.severity));
+  if (filterMode === 'critical') filtered = filtered.filter(p => p.severity === 'critical');
+  if (filterMode === 'unacked') filtered = filtered.filter(p => !ackedMap[p.id]);
+  list.innerHTML = filtered.map(p => renderCard(p)).join('');
+}
+
+function renderCard(p) {
+  const sv = p.severity;
+  const hrClass = p.vitals.hr > 100 ? 'warn' : p.vitals.hr < 50 ? 'danger' : '';
+  const spo2Class = p.vitals.spo2 < 90 ? 'danger' : p.vitals.spo2 < 95 ? 'warn' : '';
+  const pulseClass = sv === 'critical' ? 'critical-pulse' : '';
+  const selected = selectedId === p.id ? 'selected' : '';
+  return `<div class="patient-card ${pulseClass} ${selected}" onclick="selectPatient('${p.id}')">
+    <div class="severity-bar ${sv}"></div>
+    <div class="card-body">
+      <div class="card-top">
+        <div>
+          <div class="card-id">${p.id} · ${p.ambulance}</div>
+          <div class="card-complaint">${p.complaint}</div>
+        </div>
+        <span class="severity-badge ${sv}">${sv.toUpperCase()}</span>
+      </div>
+      <div class="card-meta">
+        <div class="card-meta-item"><span>Age </span>${p.age}${p.sex}</div>
+        <div class="card-meta-item"><span>Cat </span>${p.category}</div>
+        <div class="card-meta-item">${ackedMap[p.id] ? '<span style="color:var(--low)">✓ ACKED</span>' : '<span style="color:var(--high)">⚠ PENDING</span>'}</div>
+      </div>
+      <div class="vitals-row">
+        <div class="vital-chip ${hrClass}"><span class="vlabel">HR</span><span class="vval">${p.vitals.hr}</span></div>
+        <div class="vital-chip"><span class="vlabel">BP</span><span class="vval">${p.vitals.bp}</span></div>
+        <div class="vital-chip ${spo2Class}"><span class="vlabel">SpO2</span><span class="vval">${p.vitals.spo2}%</span></div>
+        <div class="vital-chip"><span class="vlabel">GCS</span><span class="vval">${p.vitals.gcs}</span></div>
+        <div class="eta-chip">
+          <div class="eta-lbl">ETA</div>
+          <div class="eta-val">${p.eta} min</div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function selectPatient(id) {
+  selectedId = id;
+  renderList();
+  const p = patients.find(x => x.id === id);
+  if (!p) return;
+  renderDetail(p);
+}
+
+function vClass(key, val) {
+  if (key === 'hr') return val > 100 ? 'warn' : val < 50 ? 'danger' : 'ok';
+  if (key === 'spo2') return val < 90 ? 'danger' : val < 95 ? 'warn' : 'ok';
+  if (key === 'rr') return val > 20 ? 'warn' : 'ok';
+  return 'ok';
+}
+
+function renderDetail(p) {
+  const dp = document.getElementById('detail-panel');
+  const acked = ackedMap[p.id];
+  dp.innerHTML = `
+    <div class="detail-header">
+      <div class="detail-enc">${p.id} · ${p.ambulance} · ${p.category}</div>
+      <div class="detail-complaint">${p.complaint}</div>
+      <div class="detail-tags">
+        <span class="severity-badge ${p.severity}">${p.severity.toUpperCase()}</span>
+        ${p.symptoms.map(s => `<span class="tag">${s}</span>`).join('')}
+        ${acked ? '<span class="ack-badge acked">ACKED</span>' : '<span class="ack-badge pending">PENDING ACK</span>'}
+      </div>
+    </div>
+
+    <div class="detail-section">
+      <div class="section-label">Patient</div>
+      <div class="demo-info">Age ${p.age} · ${p.sex === 'M' ? 'Male' : 'Female'} · ${p.conscious ? 'Conscious' : 'Unconscious'} · Breathing: ${p.breathing}</div>
+      <div style="font-size:12px;color:var(--text2);line-height:1.6;">${p.notes}</div>
+    </div>
+
+    <div class="detail-section">
+      <div class="section-label">Live Vitals</div>
+      <div class="vitals-grid">
+        <div class="vital-box"><div class="vital-box-label">Heart Rate</div><div class="vital-box-val ${vClass('hr',p.vitals.hr)}">${p.vitals.hr}<span class="vital-box-unit"> bpm</span></div></div>
+        <div class="vital-box"><div class="vital-box-label">Blood Pressure</div><div class="vital-box-val ok">${p.vitals.bp}<span class="vital-box-unit"> mmHg</span></div></div>
+        <div class="vital-box"><div class="vital-box-label">SpO2</div><div class="vital-box-val ${vClass('spo2',p.vitals.spo2)}">${p.vitals.spo2}<span class="vital-box-unit">%</span></div></div>
+        <div class="vital-box"><div class="vital-box-label">Resp Rate</div><div class="vital-box-val ${vClass('rr',p.vitals.rr)}">${p.vitals.rr}<span class="vital-box-unit"> /min</span></div></div>
+        <div class="vital-box"><div class="vital-box-label">Temp</div><div class="vital-box-val ok">${p.vitals.temp}<span class="vital-box-unit">°C</span></div></div>
+        <div class="vital-box"><div class="vital-box-label">GCS</div><div class="vital-box-val ${p.vitals.gcs < 10 ? 'danger' : p.vitals.gcs < 14 ? 'warn' : 'ok'}">${p.vitals.gcs}<span class="vital-box-unit">/15</span></div></div>
+      </div>
+    </div>
+
+    <div class="detail-section">
+      <div class="section-label">Recommended Actions</div>
+      <div class="reco-list">
+        ${p.actions.map(a => `
+          <div class="reco-item ${a.type}">
+            <span class="reco-icon">${a.icon}</span>
+            <div class="reco-text"><strong>${a.title}</strong><span>${a.detail}</span></div>
+          </div>`).join('')}
+      </div>
+    </div>
+
+    <button class="ack-btn ${acked ? 'acked' : ''}" id="ack-btn" onclick="toggleAck('${p.id}')">
+      ${acked ? '✓ ACKNOWLEDGED' : '→ ACKNOWLEDGE PATIENT'}
+    </button>
+
+    <div class="detail-section">
+      <div class="section-label">Event Timeline</div>
+      <div class="timeline-list">
+        ${p.timeline.map(t => `
+          <div class="tl-item">
+            <div class="tl-time">${t.time}</div>
+            <div style="display:flex;gap:0;align-items:flex-start;">
+              <div class="tl-dot ${t.type}"></div>
+              <div class="tl-content">
+                <div class="tl-event">${t.event}</div>
+                <div class="tl-detail">${t.detail}</div>
+              </div>
+            </div>
+          </div>`).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function toggleAck(id) {
+  ackedMap[id] = !ackedMap[id];
+  const p = patients.find(x => x.id === id);
+  renderDetail(p);
+  renderList();
+  updateMetrics();
+}
+
+function updateMetrics() {
+  const unacked = patients.filter(p => !ackedMap[p.id]).length;
+  document.getElementById('m-alerts').textContent = unacked;
+  const crits = patients.filter(p => p.severity === 'critical').length;
+  document.getElementById('m-critical').textContent = crits;
+}
+
+function updateClock() {
+  const now = new Date();
+  const h = String(now.getHours()).padStart(2,'0');
+  const m = String(now.getMinutes()).padStart(2,'0');
+  const s = String(now.getSeconds()).padStart(2,'0');
+  document.getElementById('clock').textContent = `${h}:${m}:${s}`;
+}
+
+// Simulate live ETA countdown
+let etaInterval = setInterval(() => {
+  patients.forEach(p => { if (p.eta > 0) p.eta = Math.max(0, p.eta - 1); });
+  const avg = Math.round(patients.reduce((s,p) => s+p.eta, 0) / patients.length);
+  document.getElementById('m-eta').textContent = avg + ' min';
+  if (selectedId) {
+    const p = patients.find(x => x.id === selectedId);
+    if (p) renderDetail(p);
+  }
+  renderList();
+}, 30000);
+
+// Simulate a vitals update on critical patient
+setTimeout(() => {
+  const p = patients.find(x => x.id === 'ENC-2847');
+  if (p) {
+    p.vitals.spo2 = Math.max(87, p.vitals.spo2 - 1);
+    p.vitals.hr = Math.min(125, p.vitals.hr + 3);
+    p.timeline.push({ time: new Date().toLocaleTimeString('en-CA',{hour:'2-digit',minute:'2-digit'}), event:'Vitals deteriorating', detail:`HR ${p.vitals.hr}, SpO2 ${p.vitals.spo2}%`, type:'critical' });
+    renderList();
+    if (selectedId === p.id) renderDetail(p);
+  }
+}, 8000);
+
+setInterval(updateClock, 1000);
+updateClock();
+renderList();
+
+// ── SERVER CONNECTION ──────────────────────────────────────────
+const SERVER = 'pulse-production-3ea1.up.railway.app';
+const sock = io(SERVER, { query: { role: 'hospital' } });
+
+sock.on('connect', () => {
+  console.log('Connected to PulseBridge server');
+  document.getElementById('clock').style.color = 'var(--low)';
+});
+sock.on('disconnect', () => {
+  document.getElementById('clock').style.color = 'var(--text3)';
+});
+
+// Full encounter list on first connect
+sock.on('encounters:init', (incoming) => {
+  incoming.forEach(enc => mergeEncounter(enc));
+  renderList();
+  updateMetrics();
+});
+
+// Live update from scanner
+sock.on('patient:update', (enc) => {
+  const isNew = !patients.find(p => p.id === enc.encounterId);
+  mergeEncounter(enc);
+  renderList();
+  updateMetrics();
+  if (isNew) {
+    const el = document.querySelector('.patient-card');
+    if (el) { el.classList.remove('new-flash'); void el.offsetWidth; el.classList.add('new-flash'); }
+  }
+  if (selectedId === enc.encounterId) {
+    const p = patients.find(x => x.id === enc.encounterId);
+    if (p) renderDetail(p);
+  }
+});
+
+function mergeEncounter(enc) {
+  const v = enc.vitals || {};
+  const mapped = {
+    id: enc.encounterId,
+    ambulance: enc.ambulanceId || 'AMB-01',
+    eta: enc.etaMinutes || 8,
+    age: enc.patient?.age || '?',
+    sex: enc.patient?.sex || '?',
+    complaint: enc.patient?.chiefComplaint || 'Incoming patient',
+    severity: enc.severity || 'moderate',
+    category: enc.patient?.category || 'General',
+    conscious: enc.patient?.conscious !== false,
+    breathing: enc.patient?.breathing || 'normal',
+    vitals: {
+      hr: v.heartRate || '—',
+      bp: `${v.bpSystolic || '—'}/${v.bpDiastolic || '—'}`,
+      spo2: v.spo2 || '—',
+      rr: v.respiratoryRate || '—',
+      temp: v.temperature || '—',
+      gcs: v.gcs || '—'
+    },
+    notes: enc.patient?.notes || '',
+    symptoms: enc.patient?.symptoms || [],
+    acked: enc.acked || false,
+    actions: (enc.recs || []).map(r => ({ type: 'info', icon: '→', title: r, detail: '' })),
+    timeline: enc.timeline || []
+  };
+  const idx = patients.findIndex(p => p.id === enc.encounterId);
+  if (idx >= 0) { Object.assign(patients[idx], mapped); }
+  else { patients.unshift(mapped); }
+  ackedMap[enc.encounterId] = mapped.acked;
+}
+</script>
+</body>
+</html>

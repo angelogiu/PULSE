@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PulseBridge — CV Intake</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0d0f14; --bg2: #13161e; --bg3: #1a1e28;
+    --border: rgba(255,255,255,0.07); --border2: rgba(255,255,255,0.13);
+    --text: #e8eaf0; --text2: #8b91a5; --text3: #555c70;
+    --critical: #ff4d4d; --critical-bg: rgba(255,77,77,0.12);
+    --high: #ff8c00; --high-bg: rgba(255,140,0,0.12);
+    --ok: #3ddc84; --ok-bg: rgba(61,220,132,0.1);
+    --info: #4da6ff; --info-bg: rgba(77,166,255,0.1);
+    --warn: #f5c518; --warn-bg: rgba(245,197,24,0.1);
+    --font-mono: 'IBM Plex Mono', monospace;
+    --font-sans: 'DM Sans', sans-serif;
+  }
+  body { background: var(--bg); color: var(--text); font-family: var(--font-sans); font-size: 14px; min-height: 100vh; }
+
+  .header { display: flex; align-items: center; justify-content: space-between; padding: 0 24px; height: 52px; border-bottom: 1px solid var(--border); background: var(--bg2); }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo svg { width: 26px; height: 26px; }
+  .logo-text { font-family: var(--font-mono); font-size: 13px; letter-spacing: 0.08em; }
+  .logo-sub { font-size: 10px; color: var(--text3); letter-spacing: 0.1em; text-transform: uppercase; }
+  .amb-badge { font-family: var(--font-mono); font-size: 11px; color: var(--info); background: var(--info-bg); padding: 4px 10px; border-radius: 3px; border: 1px solid rgba(77,166,255,0.2); }
+
+  .container { max-width: 900px; margin: 0 auto; padding: 32px 24px; }
+
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* STEP INDICATOR */
+  .steps { display: flex; align-items: center; gap: 0; margin-bottom: 36px; }
+  .step { display: flex; align-items: center; gap: 8px; }
+  .step-num { width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--border2); display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 11px; color: var(--text3); flex-shrink: 0; }
+  .step.active .step-num { background: var(--info); border-color: var(--info); color: #000; }
+  .step.done .step-num { background: var(--ok); border-color: var(--ok); color: #000; }
+  .step-label { font-size: 12px; color: var(--text3); }
+  .step.active .step-label { color: var(--text); }
+  .step.done .step-label { color: var(--ok); }
+  .step-line { flex: 1; height: 1px; background: var(--border); margin: 0 12px; }
+
+  /* UPLOAD AREA */
+  .upload-area { border: 1.5px dashed var(--border2); border-radius: 8px; padding: 48px 24px; text-align: center; cursor: pointer; transition: all .2s; position: relative; background: var(--bg2); }
+  .upload-area:hover, .upload-area.drag { border-color: var(--info); background: var(--info-bg); }
+  .upload-area input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .upload-icon { margin-bottom: 16px; }
+  .upload-title { font-size: 16px; font-weight: 500; margin-bottom: 8px; }
+  .upload-sub { font-size: 13px; color: var(--text2); line-height: 1.6; }
+  .upload-sub strong { color: var(--info); }
+
+  .preview-wrap { position: relative; border-radius: 8px; overflow: hidden; border: 1px solid var(--border2); background: var(--bg2); margin-bottom: 20px; }
+  .preview-img { width: 100%; max-height: 360px; object-fit: contain; display: block; background: #000; }
+  .preview-label { position: absolute; top: 12px; left: 12px; background: rgba(0,0,0,0.7); border: 1px solid var(--border2); padding: 4px 10px; border-radius: 3px; font-family: var(--font-mono); font-size: 10px; color: var(--text2); }
+
+  /* SCANNING OVERLAY */
+  .scan-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.65); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; }
+  .scan-line { width: 80%; height: 2px; background: linear-gradient(90deg, transparent, var(--info), transparent); animation: scan 1.8s ease-in-out infinite; position: relative; }
+  @keyframes scan { 0%,100%{transform:translateY(-80px);opacity:0} 20%,80%{opacity:1} 50%{transform:translateY(80px)} }
+  .scan-text { font-family: var(--font-mono); font-size: 12px; color: var(--info); letter-spacing: 0.1em; }
+  .scan-dots::after { content: ''; animation: dots 1.2s steps(4) infinite; }
+  @keyframes dots { 0%{content:''} 25%{content:'.'} 50%{content:'..'} 75%{content:'...'} }
+
+  /* CONFIDENCE ANNOTATION */
+  .annotations { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; margin-bottom: 24px; }
+  .ann-chip { background: var(--bg3); border-radius: 4px; padding: 10px 12px; border: 1px solid var(--border); position: relative; overflow: hidden; }
+  .ann-chip::after { content: ''; position: absolute; bottom: 0; left: 0; height: 2px; background: var(--ok); }
+  .ann-chip.high-conf::after { width: 95%; background: var(--ok); }
+  .ann-chip.med-conf::after { width: 70%; background: var(--warn); }
+  .ann-chip.low-conf::after { width: 40%; background: var(--critical); }
+  .ann-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text3); margin-bottom: 4px; }
+  .ann-val { font-family: var(--font-mono); font-size: 20px; font-weight: 500; color: var(--text); }
+  .ann-val.ok { color: var(--ok); }
+  .ann-val.warn { color: var(--warn); }
+  .ann-val.danger { color: var(--critical); }
+  .ann-unit { font-size: 10px; color: var(--text3); }
+  .ann-conf { font-size: 10px; font-family: var(--font-mono); margin-top: 4px; }
+  .ann-conf.high { color: var(--ok); }
+  .ann-conf.med { color: var(--warn); }
+  .ann-conf.low { color: var(--critical); }
+
+  /* CONTEXT FIELDS */
+  .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 24px; }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text3); }
+  .field input, .field select, .field textarea {
+    background: var(--bg3); border: 1px solid var(--border2); border-radius: 4px;
+    color: var(--text); font-family: var(--font-sans); font-size: 14px; padding: 10px 12px;
+    outline: none; transition: border-color .15s;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--info); }
+  .field textarea { resize: vertical; min-height: 72px; grid-column: span 2; }
+  .field select option { background: var(--bg3); }
+  .field-full { grid-column: span 2; }
+
+  /* SYMPTOM CHIPS */
+  .chip-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { padding: 6px 14px; border-radius: 3px; border: 1px solid var(--border2); background: var(--bg3); color: var(--text2); font-size: 12px; cursor: pointer; transition: all .15s; user-select: none; }
+  .chip:hover { border-color: var(--info); color: var(--text); }
+  .chip.active { background: var(--info-bg); border-color: rgba(77,166,255,0.4); color: var(--info); }
+  .chip.active.red { background: var(--critical-bg); border-color: rgba(255,77,77,0.4); color: var(--critical); }
+
+  /* SECTION */
+  .section { margin-bottom: 28px; }
+  .section-title { font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--text3); margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+
+  /* REVIEW CARD */
+  .review-card { background: var(--bg2); border: 1px solid var(--border2); border-radius: 8px; overflow: hidden; margin-bottom: 20px; }
+  .review-header { padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .review-body { padding: 18px; }
+  .review-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .review-item { }
+  .review-item-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text3); margin-bottom: 3px; }
+  .review-item-val { font-size: 14px; color: var(--text); font-weight: 500; }
+
+  .severity-bar-preview { height: 4px; border-radius: 2px; margin-bottom: 14px; }
+  .severity-bar-preview.critical { background: var(--critical); }
+  .severity-bar-preview.high { background: var(--high); }
+  .severity-bar-preview.moderate { background: var(--warn); }
+
+  .rec-list { display: flex; flex-direction: column; gap: 6px; }
+  .rec-item { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; background: var(--bg3); border-radius: 4px; font-size: 12px; color: var(--text2); border-left: 3px solid var(--info); }
+
+  /* BUTTONS */
+  .btn { padding: 11px 24px; border-radius: 4px; font-family: var(--font-sans); font-size: 13px; font-weight: 500; cursor: pointer; transition: all .15s; border: 1px solid; }
+  .btn-primary { background: var(--info); border-color: var(--info); color: #000; }
+  .btn-primary:hover { opacity: 0.88; }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-ghost { background: transparent; border-color: var(--border2); color: var(--text2); }
+  .btn-ghost:hover { background: var(--bg3); color: var(--text); }
+  .btn-emergency { background: var(--critical-bg); border-color: rgba(255,77,77,0.4); color: var(--critical); font-family: var(--font-mono); letter-spacing: 0.05em; width: 100%; padding: 14px; font-size: 14px; margin-top: 8px; }
+  .btn-emergency:hover { background: rgba(255,77,77,0.2); }
+  .btn-send { background: var(--ok-bg); border-color: rgba(61,220,132,0.3); color: var(--ok); font-family: var(--font-mono); letter-spacing: 0.05em; width: 100%; padding: 14px; font-size: 14px; }
+  .btn-send:hover { background: rgba(61,220,132,0.18); }
+  .btn-row { display: flex; gap: 10px; justify-content: flex-end; margin-top: 8px; }
+
+  /* SUCCESS STATE */
+  .success-wrap { text-align: center; padding: 48px 24px; }
+  .success-enc { font-family: var(--font-mono); font-size: 28px; font-weight: 500; color: var(--ok); margin-bottom: 8px; }
+  .success-sub { color: var(--text2); margin-bottom: 32px; }
+  .status-track { background: var(--bg2); border: 1px solid var(--border2); border-radius: 8px; padding: 20px; max-width: 400px; margin: 0 auto 24px; text-align: left; }
+  .track-item { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+  .track-item:last-child { border-bottom: none; }
+  .track-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .track-dot.ok { background: var(--ok); }
+  .track-dot.pending { background: var(--warn); animation: pulse-dot 1.5s infinite; }
+  .track-dot.wait { background: var(--text3); }
+  @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  .track-label { font-size: 13px; color: var(--text); }
+  .track-time { font-family: var(--font-mono); font-size: 11px; color: var(--text3); margin-left: auto; }
+
+  .note-box { background: var(--bg3); border-radius: 4px; padding: 12px 14px; font-size: 12px; color: var(--text2); line-height: 1.6; border-left: 3px solid var(--info); margin-top: 12px; }
+
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">
+    <svg viewBox="0 0 26 26" fill="none"><rect x="1" y="1" width="24" height="24" rx="4" stroke="#4da6ff" stroke-width="1.5"/><path d="M4 13h4l2-5.5 3 11 2-7 2 3.5h5" stroke="#ff4d4d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <div>
+      <div class="logo-text">PULSEBRIDGE</div>
+      <div class="logo-sub">EMS Interface</div>
+    </div>
+  </div>
+  <div class="amb-badge" id="amb-id">AMB-04 · Unit Active</div>
+</div>
+
+<div class="container">
+
+  <!-- STEP INDICATOR -->
+  <div class="steps">
+    <div class="step active" id="step1">
+      <div class="step-num">1</div>
+      <div class="step-label">Scan Monitor</div>
+    </div>
+    <div class="step-line"></div>
+    <div class="step" id="step2">
+      <div class="step-num">2</div>
+      <div class="step-label">Context</div>
+    </div>
+    <div class="step-line"></div>
+    <div class="step" id="step3">
+      <div class="step-num">3</div>
+      <div class="step-label">Review & Send</div>
+    </div>
+    <div class="step-line"></div>
+    <div class="step" id="step4">
+      <div class="step-num">4</div>
+      <div class="step-label">Transmitted</div>
+    </div>
+  </div>
+
+  <!-- PAGE 1: SCAN -->
+  <div class="page active" id="page-scan">
+    <div class="section">
+      <div class="section-title">Patient Monitor Scan</div>
+      <div class="upload-area" id="upload-area" ondragover="onDrag(event,true)" ondragleave="onDrag(event,false)" ondrop="onDrop(event)">
+        <input type="file" accept="image/*" onchange="onFile(event)" id="file-input">
+        <div class="upload-icon">
+          <svg width="44" height="44" viewBox="0 0 44 44" fill="none"><rect x="1" y="1" width="42" height="42" rx="8" stroke="#555c70" stroke-width="1.5"/><path d="M22 28V16M16 22l6-6 6 6" stroke="#4da6ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 32h16" stroke="#555c70" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </div>
+        <div class="upload-title">Point camera at patient monitor</div>
+        <div class="upload-sub">Tap to upload or drag a photo — <strong>Claude Vision</strong> will extract all vitals automatically.<br>Works with Philips, GE, Mindray, Zoll, and most bedside monitors.</div>
+      </div>
+    </div>
+
+    <div class="note-box">
+      <strong style="color:var(--info)">How it works:</strong> A mounted tablet camera captures the monitor display every ~15 seconds. No typing required. The CV pipeline reads heart rate, BP, SpO2, RR, temperature, and GCS directly from the screen using Claude Vision, then streams structured data to the hospital dashboard in real time.
+    </div>
+
+    <div class="btn-row" style="margin-top:20px">
+      <button class="btn btn-ghost" onclick="loadDemo()">Load demo image →</button>
+    </div>
+  </div>
+
+  <!-- PAGE 2: CONTEXT (shown after scan) -->
+  <div class="page" id="page-context">
+    <div id="preview-container"></div>
+
+    <div class="section">
+      <div class="section-title">Extracted Vitals — CV Confidence</div>
+      <div class="annotations" id="annotations"></div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Patient Context</div>
+      <div class="field-grid">
+        <div class="field">
+          <label>Approx Age</label>
+          <input type="number" id="f-age" placeholder="e.g. 62" min="0" max="120">
+        </div>
+        <div class="field">
+          <label>Sex</label>
+          <select id="f-sex">
+            <option value="">—</option>
+            <option value="M">Male</option>
+            <option value="F">Female</option>
+            <option value="U">Unknown</option>
+          </select>
+        </div>
+        <div class="field field-full">
+          <label>Chief Complaint</label>
+          <input type="text" id="f-complaint" placeholder="e.g. Chest pain, difficulty breathing…">
+        </div>
+        <div class="field">
+          <label>ETA (minutes)</label>
+          <input type="number" id="f-eta" placeholder="8" min="1" max="90">
+        </div>
+        <div class="field">
+          <label>Mechanism / Context</label>
+          <input type="text" id="f-mechanism" placeholder="e.g. MVA, fall, cardiac">
+        </div>
+        <div class="field field-full">
+          <label>Notes</label>
+          <textarea id="f-notes" placeholder="History, medications, known conditions…"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Flags</div>
+      <div class="chip-grid" id="flags">
+        <div class="chip red" onclick="toggleChip(this)">Chest Pain</div>
+        <div class="chip red" onclick="toggleChip(this)">Stroke / FAST+</div>
+        <div class="chip red" onclick="toggleChip(this)">Trauma</div>
+        <div class="chip" onclick="toggleChip(this)">Unconscious</div>
+        <div class="chip" onclick="toggleChip(this)">Resp Distress</div>
+        <div class="chip" onclick="toggleChip(this)">Diabetic Emergency</div>
+        <div class="chip" onclick="toggleChip(this)">Allergic Reaction</div>
+        <div class="chip" onclick="toggleChip(this)">Overdose / Tox</div>
+        <div class="chip" onclick="toggleChip(this)">Obstetric</div>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-ghost" onclick="goPage('scan')">← Back</button>
+      <button class="btn btn-primary" onclick="goReview()">Review & Score →</button>
+    </div>
+  </div>
+
+  <!-- PAGE 3: REVIEW -->
+  <div class="page" id="page-review">
+    <div id="review-content"></div>
+
+    <button class="btn btn-emergency" onclick="alert('Emergency alert sent to all hospital bays')">⚡ TRIGGER EMERGENCY ALERT</button>
+    <button class="btn btn-send" onclick="sendEncounter()" style="margin-top:10px">→ TRANSMIT TO HOSPITAL</button>
+  </div>
+
+  <!-- PAGE 4: TRANSMITTED -->
+  <div class="page" id="page-sent">
+    <div class="success-wrap">
+      <div style="margin-bottom:16px">
+        <svg width="56" height="56" viewBox="0 0 56 56" fill="none"><circle cx="28" cy="28" r="27" stroke="#3ddc84" stroke-width="1.5"/><path d="M18 28l7 7 13-14" stroke="#3ddc84" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="success-enc" id="sent-enc">ENC-2847</div>
+      <div class="success-sub">Encounter transmitted — hospital is preparing</div>
+      <div class="status-track">
+        <div class="track-item"><div class="track-dot ok"></div><div class="track-label">Intake published to Kafka</div><div class="track-time" id="t1">—</div></div>
+        <div class="track-item"><div class="track-dot ok"></div><div class="track-label">Risk score computed</div><div class="track-time" id="t2">—</div></div>
+        <div class="track-item"><div class="track-dot pending"></div><div class="track-label">Hospital acknowledged</div><div class="track-time" id="t3">Waiting…</div></div>
+        <div class="track-item"><div class="track-dot wait"></div><div class="track-label">Bay assignment</div><div class="track-time" id="t4">—</div></div>
+      </div>
+      <button class="btn btn-ghost" onclick="reset()" style="margin-top:4px">+ New Patient</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── STATE ──
+let extractedVitals = null;
+let capturedImageB64 = null;
+let currentPage = 'scan';
+
+// ── NAVIGATION ──
+function goPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  currentPage = name;
+  const stepMap = { scan:1, context:2, review:3, sent:4 };
+  const steps = document.querySelectorAll('.step');
+  steps.forEach((s,i) => {
+    s.classList.remove('active','done');
+    const n = i + 1;
+    if (n < stepMap[name]) s.classList.add('done');
+    if (n === stepMap[name]) s.classList.add('active');
+  });
+}
+
+function toggleChip(el) { el.classList.toggle('active'); }
+
+// ── FILE HANDLING ──
+function onDrag(e, on) { e.preventDefault(); document.getElementById('upload-area').classList.toggle('drag', on); }
+function onDrop(e) { e.preventDefault(); onDrag(e, false); const f = e.dataTransfer.files[0]; if (f) processFile(f); }
+function onFile(e) { const f = e.target.files[0]; if (f) processFile(f); }
+
+function processFile(file) {
+  const reader = new FileReader();
+  reader.onload = ev => {
+    capturedImageB64 = ev.target.result.split(',')[1];
+    const mimeMatch = ev.target.result.match(/data:(image\/\w+);/);
+    const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+    showPreviewAndScan(ev.target.result, mime, capturedImageB64);
+  };
+  reader.readAsDataURL(file);
+}
+
+function loadDemo() {
+  // Simulate with a demo vitals monitor screenshot placeholder
+  capturedImageB64 = null;
+  showDemoScan();
+}
+
+// ── PREVIEW & SCAN ──
+function showPreviewAndScan(src, mime, b64) {
+  goPage('context');
+  renderPreview(src, true);
+  callVisionAPI(mime, b64);
+}
+
+function showDemoScan() {
+  goPage('context');
+  renderPreview(null, true);
+  setTimeout(() => simulateDemoExtraction(), 2200);
+}
+
+function renderPreview(src, scanning) {
+  const c = document.getElementById('preview-container');
+  c.innerHTML = `<div class="preview-wrap" style="margin-bottom:20px">
+    ${src ? `<img class="preview-img" src="${src}" id="preview-img">` : `<div style="height:220px;background:#0a0c10;display:flex;align-items:center;justify-content:center;"><span style="font-family:var(--font-mono);font-size:12px;color:var(--text3)">DEMO MODE — no image uploaded</span></div>`}
+    ${scanning ? `<div class="scan-overlay" id="scan-overlay">
+      <div class="scan-line"></div>
+      <div class="scan-text">ANALYZING MONITOR DISPLAY<span class="scan-dots"></span></div>
+    </div>` : ''}
+    <div class="preview-label">CAMERA FEED · AMB-04</div>
+  </div>`;
+}
+
+async function callVisionAPI(mime, b64) {
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        messages: [{
+          role: 'user',
+          content: [
+            {
+              type: 'image',
+              source: { type: 'base64', media_type: mime, data: b64 }
+            },
+            {
+              type: 'text',
+              text: `You are a medical device OCR system inside an ambulance. Analyze this image. If it shows a patient vitals monitor, extract the displayed values. If it is NOT a vitals monitor (e.g. a person, a scene, random objects), still try to be helpful but set all vitals to null.
+
+Respond ONLY with valid JSON, no markdown, no explanation:
+{
+  "isMonitor": true or false,
+  "heartRate": number or null,
+  "bpSystolic": number or null,
+  "bpDiastolic": number or null,
+  "spo2": number or null,
+  "respiratoryRate": number or null,
+  "temperature": number or null,
+  "gcs": number or null,
+  "notes": "any text visible on screen relevant to patient condition, or empty string",
+  "confidence": { "heartRate": "high|med|low", "bpSystolic": "high|med|low", "spo2": "high|med|low", "respiratoryRate": "high|med|low", "temperature": "high|med|low" }
+}`
+            }
+          ]
+        }]
+      })
+    });
+    const data = await res.json();
+    const text = data.content?.find(b => b.type === 'text')?.text || '{}';
+    const clean = text.replace(/```json|```/g, '').trim();
+    extractedVitals = JSON.parse(clean);
+    renderAnnotations(extractedVitals);
+    removeScanOverlay();
+  } catch(e) {
+    console.error(e);
+    simulateDemoExtraction();
+  }
+}
+
+function simulateDemoExtraction() {
+  extractedVitals = {
+    isMonitor: true,
+    heartRate: 112, bpSystolic: 92, bpDiastolic: 60,
+    spo2: 91, respiratoryRate: 22, temperature: 37.2, gcs: 14,
+    notes: 'DEMO DATA — upload a real monitor photo to extract live values',
+    confidence: { heartRate:'high', bpSystolic:'high', spo2:'high', respiratoryRate:'med', temperature:'med' }
+  };
+  renderAnnotations(extractedVitals);
+  removeScanOverlay();
+}
+
+function removeScanOverlay() {
+  const o = document.getElementById('scan-overlay');
+  if (o) o.remove();
+}
+
+function vClass(key, val) {
+  if (!val) return '';
+  if (key === 'heartRate') return val > 100 ? 'warn' : val < 50 ? 'danger' : 'ok';
+  if (key === 'spo2') return val < 90 ? 'danger' : val < 95 ? 'warn' : 'ok';
+  if (key === 'respiratoryRate') return val > 20 ? 'warn' : 'ok';
+  return 'ok';
+}
+
+function renderAnnotations(v) {
+  const fields = [
+    { key:'heartRate', label:'Heart Rate', unit:'bpm' },
+    { key:'bpSystolic', label:'BP Systolic', unit:'mmHg' },
+    { key:'bpDiastolic', label:'BP Diastolic', unit:'mmHg' },
+    { key:'spo2', label:'SpO2', unit:'%' },
+    { key:'respiratoryRate', label:'Resp Rate', unit:'/min' },
+    { key:'temperature', label:'Temp', unit:'°C' },
+    { key:'gcs', label:'GCS', unit:'/15' },
+  ];
+  const conf = v.confidence || {};
+  document.getElementById('annotations').innerHTML = fields.map(f => {
+    const val = v[f.key];
+    const c = conf[f.key] || 'high';
+    const cls = val ? vClass(f.key, val) : '';
+    return `<div class="ann-chip ${c}-conf">
+      <div class="ann-label">${f.label}</div>
+      <div class="ann-val ${cls}">${val ?? '—'}<span class="ann-unit"> ${val ? f.unit : ''}</span></div>
+      <div class="ann-conf ${c === 'high' ? 'high' : c === 'med' ? 'med' : 'low'}">${c === 'high' ? '✓ High confidence' : c === 'med' ? '~ Medium confidence' : '! Low — verify'}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── SCORING ──
+function scoreRisk(v, flags) {
+  if (!v) return { level: 'moderate', label: 'Moderate', recs: [] };
+  const activeFlags = [...flags].filter(c => c.classList.contains('active')).map(c => c.textContent);
+  let score = 0;
+  const recs = [];
+  if (v.spo2 && v.spo2 < 90) { score += 3; recs.push('Prepare respiratory support — SpO2 critical'); }
+  else if (v.spo2 && v.spo2 < 95) { score += 1; recs.push('Monitor SpO2 — below normal'); }
+  if (v.bpSystolic && v.bpSystolic < 90) { score += 3; recs.push('Hypotension — IV access, fluid bolus'); }
+  if (v.heartRate && v.heartRate > 120) { score += 2; recs.push('Tachycardia — 12-lead ECG if available'); }
+  if (v.gcs && v.gcs < 10) { score += 3; recs.push('Altered consciousness — airway management'); }
+  if (v.respiratoryRate && v.respiratoryRate > 25) { score += 2; recs.push('High RR — respiratory compromise'); }
+  if (activeFlags.includes('Chest Pain')) { score += 2; recs.push('Chest pain — activate cardiac pathway'); }
+  if (activeFlags.includes('Stroke / FAST+')) { score += 3; recs.push('FAST positive — notify stroke team, CT angio'); }
+  if (activeFlags.includes('Trauma')) { score += 2; recs.push('Trauma mechanism — trauma bay activation'); }
+  if (activeFlags.includes('Unconscious')) { score += 3; recs.push('Unconscious patient — protect airway'); }
+  if (score >= 6) return { level:'critical', label:'CRITICAL', recs };
+  if (score >= 3) return { level:'high', label:'HIGH', recs };
+  if (score >= 1) return { level:'moderate', label:'MODERATE', recs };
+  return { level:'low', label:'LOW', recs: recs.length ? recs : ['Vitals stable — standard bay intake'] };
+}
+
+function goReview() {
+  const flags = document.querySelectorAll('#flags .chip');
+  const risk = scoreRisk(extractedVitals, flags);
+  const complaint = document.getElementById('f-complaint').value || '—';
+  const age = document.getElementById('f-age').value || '?';
+  const sex = document.getElementById('f-sex').value || '?';
+  const eta = document.getElementById('f-eta').value || '?';
+  const notes = document.getElementById('f-notes').value;
+  const activeFlags = [...flags].filter(c => c.classList.contains('active')).map(c => c.textContent);
+  const v = extractedVitals || {};
+
+  document.getElementById('review-content').innerHTML = `
+    <div class="section-title" style="margin-bottom:16px;padding-bottom:8px;border-bottom:1px solid var(--border);font-family:var(--font-mono);font-size:10px;letter-spacing:.12em;color:var(--text3)">Encounter Review — Ready to Transmit</div>
+    <div class="review-card">
+      <div class="review-header">
+        <div>
+          <div style="font-family:var(--font-mono);font-size:10px;color:var(--text3);margin-bottom:4px">NEW ENCOUNTER · AMB-04</div>
+          <div style="font-size:16px;font-weight:500">${complaint}</div>
+        </div>
+        <div style="padding:4px 12px;border-radius:3px;font-family:var(--font-mono);font-size:12px;
+          ${risk.level==='critical'?'background:var(--critical-bg);color:var(--critical)':risk.level==='high'?'background:var(--high-bg);color:var(--high)':risk.level==='moderate'?'background:var(--warn-bg);color:var(--warn)':'background:var(--ok-bg);color:var(--ok)'}">${risk.label}</div>
+      </div>
+      <div class="review-body">
+        <div class="severity-bar-preview ${risk.level}"></div>
+        <div class="review-grid" style="margin-bottom:16px">
+          <div class="review-item"><div class="review-item-label">Age / Sex</div><div class="review-item-val">${age} / ${sex}</div></div>
+          <div class="review-item"><div class="review-item-label">ETA</div><div class="review-item-val">${eta} min</div></div>
+          <div class="review-item"><div class="review-item-label">Flags</div><div class="review-item-val">${activeFlags.join(', ') || 'None'}</div></div>
+          <div class="review-item"><div class="review-item-label">HR</div><div class="review-item-val" style="color:${v.heartRate>100?'var(--warn)':'var(--ok)'}">${v.heartRate ?? '—'} bpm</div></div>
+          <div class="review-item"><div class="review-item-label">BP</div><div class="review-item-val">${v.bpSystolic ?? '—'}/${v.bpDiastolic ?? '—'}</div></div>
+          <div class="review-item"><div class="review-item-label">SpO2</div><div class="review-item-val" style="color:${v.spo2&&v.spo2<90?'var(--critical)':v.spo2&&v.spo2<95?'var(--warn)':'var(--ok)'}">${v.spo2 ?? '—'}%</div></div>
+          <div class="review-item"><div class="review-item-label">RR</div><div class="review-item-val">${v.respiratoryRate ?? '—'}/min</div></div>
+          <div class="review-item"><div class="review-item-label">Temp</div><div class="review-item-val">${v.temperature ?? '—'}°C</div></div>
+          <div class="review-item"><div class="review-item-label">GCS</div><div class="review-item-val">${v.gcs ?? '—'}/15</div></div>
+        </div>
+        ${notes ? `<div style="font-size:12px;color:var(--text2);background:var(--bg3);padding:10px 12px;border-radius:4px;margin-bottom:14px;line-height:1.6">${notes}</div>` : ''}
+        ${risk.recs.length ? `<div style="font-family:var(--font-mono);font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);margin-bottom:8px">Recommended Hospital Actions</div>
+        <div class="rec-list">${risk.recs.map(r => `<div class="rec-item">→ ${r}</div>`).join('')}</div>` : ''}
+      </div>
+    </div>
+  `;
+  goPage('review');
+}
+
+function sendEncounter() {
+  const encId = 'ENC-' + (2840 + Math.floor(Math.random() * 100));
+  document.getElementById('sent-enc').textContent = encId;
+  const now = new Date();
+  const fmt = d => d.toLocaleTimeString('en-CA',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  document.getElementById('t1').textContent = fmt(now);
+  setTimeout(() => { document.getElementById('t2').textContent = fmt(new Date()); }, 600);
+  setTimeout(() => {
+    const t3 = document.querySelector('.status-track .track-item:nth-child(3) .track-dot');
+    t3.className = 'track-dot ok';
+    document.getElementById('t3').textContent = fmt(new Date());
+    document.querySelector('.status-track .track-item:nth-child(4) .track-dot').className = 'track-dot ok';
+    document.getElementById('t4').textContent = 'Bay 3';
+  }, 3000);
+  goPage('sent');
+}
+
+function reset() {
+  extractedVitals = null;
+  capturedImageB64 = null;
+  document.getElementById('f-age').value = '';
+  document.getElementById('f-sex').value = '';
+  document.getElementById('f-complaint').value = '';
+  document.getElementById('f-eta').value = '';
+  document.getElementById('f-mechanism').value = '';
+  document.getElementById('f-notes').value = '';
+  document.querySelectorAll('#flags .chip').forEach(c => c.classList.remove('active'));
+  document.getElementById('file-input').value = '';
+  goPage('scan');
+}
+</script>
+</body>
+</html>

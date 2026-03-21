@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Pulse — Live CV Scanner</title>
+<title>PulseBridge — Live CV Scanner</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap');
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -181,7 +181,7 @@
   <div class="logo">
     <svg viewBox="0 0 26 26" fill="none"><rect x="1" y="1" width="24" height="24" rx="4" stroke="#4da6ff" stroke-width="1.5"/><path d="M4 13h4l2-5.5 3 11 2-7 2 3.5h5" stroke="#ff4d4d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
     <div>
-      <div class="logo-text">PULSE</div>
+      <div class="logo-text">PULSEBRIDGE</div>
       <div class="logo-sub">Live CV Scanner</div>
     </div>
   </div>
@@ -198,6 +198,15 @@
 
   <!-- LEFT: CAMERA + LOG -->
   <div class="cam-side">
+
+    <!-- API KEY -->
+    <div>
+      <div class="key-label">Anthropic API Key</div>
+      <div class="key-row">
+        <input type="password" id="api-key" placeholder="sk-ant-..." autocomplete="off">
+        <button class="btn btn-ghost" onclick="toggleKeyVis()" id="key-vis-btn" style="padding:8px 14px;font-size:12px">Show</button>
+      </div>
+    </div>
 
     <!-- CAMERA FEED -->
     <div class="cam-wrap" id="cam-wrap">
@@ -237,7 +246,7 @@
     <div>
       <div class="section-title">Event Log</div>
       <div class="log-list" id="log-list">
-        <div class="log-item"><span class="log-time">--:--</span><span class="log-msg">Ready — start camera to scan</span></div>
+        <div class="log-item"><span class="log-time">--:--</span><span class="log-msg">Ready — enter API key and start camera</span></div>
       </div>
     </div>
 
@@ -328,7 +337,24 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/socket.io-client@4.7.2/dist/socket.io.min.js"></script>
 <script>
+// ── SERVER CONNECTION ──────────────────────────────────────────
+const SERVER = 'pulse-production-3ea1.up.railway.app'
+let socket = null
+let encounterId = 'ENC-' + Date.now().toString(36).toUpperCase()
+
+function connectSocket() {
+  socket = io(SERVER, { query: { role: 'scanner' } })
+  socket.on('connect', () => log('Connected to PulseBridge server', 'ok'))
+  socket.on('disconnect', () => log('Server disconnected', 'warn'))
+  socket.on('patient:acked', ({ encounterId: id }) => {
+    if (id === encounterId) log('Hospital acknowledged patient ✓', 'ok')
+  })
+  socket.on('connect_error', () => log('Server offline — run: npm start', 'err'))
+}
+connectSocket()
+
 // ── STATE ──────────────────────────────────────────────────────
 let stream = null;
 let scanInterval = null;
@@ -338,6 +364,14 @@ let isScanning = false;
 let hasData = false;
 let facingMode = 'environment'; // rear cam by default
 let history = { hr: [], spo2: [], bp: [] };
+
+// ── KEY VIS ─────────────────────────────────────────────────────
+function toggleKeyVis() {
+  const inp = document.getElementById('api-key');
+  const btn = document.getElementById('key-vis-btn');
+  if (inp.type === 'password') { inp.type = 'text'; btn.textContent = 'Hide'; }
+  else { inp.type = 'password'; btn.textContent = 'Show'; }
+}
 
 // ── CAMERA ──────────────────────────────────────────────────────
 async function startScanning() {
@@ -388,6 +422,8 @@ function updateInterval(v) {
 
 // ── CAPTURE ──────────────────────────────────────────────────────
 async function captureNow() {
+  const apiKey = document.getElementById('api-key').value.trim();
+  if (!apiKey) { log('No API key — enter key first', 'warn'); return; }
   const video = document.getElementById('video');
   if (!video.srcObject) { log('No camera feed', 'err'); return; }
 
@@ -412,7 +448,7 @@ async function captureNow() {
   scanCount++;
   document.getElementById('scan-count').textContent = scanCount + ' scan' + (scanCount !== 1 ? 's' : '');
 
-  await callVision(b64);
+  await callVision(apiKey, b64);
 }
 
 function triggerScanLine() {
@@ -423,30 +459,67 @@ function triggerScanLine() {
   setTimeout(() => el.classList.remove('active'), 2100);
 }
 
-// ── VISION API (proxied via server — uses API key from .env) ───────
-async function callVision(b64) {
+// ── VISION API ────────────────────────────────────────────────────
+async function callVision(apiKey, b64) {
   try {
-    const res = await fetch('/api/vision', {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ imageBase64: b64, imageMime: 'image/jpeg' }),
+      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 700,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: b64 } },
+            { type: 'text', text: `You are an ambulance monitor OCR system. Analyze this image.
+
+If it shows a patient vitals monitor or any screen with medical numbers, extract all visible values.
+If it shows a printed page, photo of a monitor, or screen — extract the numbers from it.
+Be generous: try to extract anything that looks like HR, BP, SpO2, RR, temperature, or GCS.
+
+Respond ONLY with this exact JSON structure, no markdown, no explanation:
+{
+  "found": true,
+  "heartRate": null,
+  "bpSystolic": null,
+  "bpDiastolic": null,
+  "spo2": null,
+  "respiratoryRate": null,
+  "temperature": null,
+  "gcs": null,
+  "rawText": "any other numbers or text you can see on screen",
+  "confidence": {
+    "heartRate": "high",
+    "bpSystolic": "high",
+    "spo2": "high",
+    "respiratoryRate": "med",
+    "temperature": "med",
+    "gcs": "low"
+  },
+  "notes": "brief description of what you see in the image"
+}
+
+Use null for values you cannot find. Confidence: high = clearly visible, med = partially visible or inferred, low = guessed.` }
+          ]
+        }]
+      })
     });
 
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      const msg = err.error || err.message || res.status;
-      log('API error: ' + msg, 'err');
-      if (res.status === 500 && msg.includes('API key')) {
-        log('Check ANTHROPIC_API_KEY in your .env file', 'warn');
-      }
+      const err = await res.json();
+      log('API error: ' + (err.error?.message || res.status), 'err');
       setStatus('scanning', 'LIVE');
       return;
     }
 
-    const result = await res.json();
+    const data = await res.json();
+    const text = data.content?.find(b => b.type === 'text')?.text || '{}';
+    const clean = text.replace(/```json|```/g, '').trim();
+    const result = JSON.parse(clean);
     setStatus('scanning', 'LIVE');
     handleResult(result);
-  } catch (e) {
+  } catch(e) {
     log('Parse/network error: ' + e.message, 'err');
     setStatus('scanning', 'LIVE');
   }
@@ -489,6 +562,9 @@ function handleResult(r) {
 
   hasData = true;
   document.getElementById('btn-transmit').disabled = false;
+
+  // Push to server → hospital dashboard
+  postToServer(r, score);
 
   // Draw bounding box hints
   renderDetections(r);
@@ -611,6 +687,30 @@ function renderDetections(r) {
       <span class="detect-label">${r.label}</span>
     </div>`).join('');
   setTimeout(() => { ov.innerHTML = ''; }, 4000);
+}
+
+// ── POST TO SERVER ────────────────────────────────────────────
+function postToServer(vitals, score) {
+  fetch(SERVER + '/intake', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      encounterId,
+      ambulanceId: 'AMB-01',
+      vitals: {
+        heartRate: vitals.heartRate,
+        bpSystolic: vitals.bpSystolic,
+        bpDiastolic: vitals.bpDiastolic,
+        spo2: vitals.spo2,
+        respiratoryRate: vitals.respiratoryRate,
+        temperature: vitals.temperature,
+        gcs: vitals.gcs,
+      },
+      severity: score.level,
+      recs: score.recs,
+      etaMinutes: parseInt(document.getElementById('eta-input')?.value) || 8,
+    })
+  }).catch(() => {}) // silent if server offline
 }
 
 // ── TRANSMIT ──────────────────────────────────────────────────────
