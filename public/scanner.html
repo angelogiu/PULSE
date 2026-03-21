@@ -199,15 +199,6 @@
   <!-- LEFT: CAMERA + LOG -->
   <div class="cam-side">
 
-    <!-- API KEY -->
-    <div>
-      <div class="key-label">Anthropic API Key</div>
-      <div class="key-row">
-        <input type="password" id="api-key" placeholder="sk-ant-..." autocomplete="off">
-        <button class="btn btn-ghost" onclick="toggleKeyVis()" id="key-vis-btn" style="padding:8px 14px;font-size:12px">Show</button>
-      </div>
-    </div>
-
     <!-- CAMERA FEED -->
     <div class="cam-wrap" id="cam-wrap">
       <video id="video" autoplay muted playsinline></video>
@@ -246,7 +237,7 @@
     <div>
       <div class="section-title">Event Log</div>
       <div class="log-list" id="log-list">
-        <div class="log-item"><span class="log-time">--:--</span><span class="log-msg">Ready — enter API key and start camera</span></div>
+        <div class="log-item"><span class="log-time">--:--</span><span class="log-msg">Ready — start camera to scan</span></div>
       </div>
     </div>
 
@@ -348,14 +339,6 @@ let hasData = false;
 let facingMode = 'environment'; // rear cam by default
 let history = { hr: [], spo2: [], bp: [] };
 
-// ── KEY VIS ─────────────────────────────────────────────────────
-function toggleKeyVis() {
-  const inp = document.getElementById('api-key');
-  const btn = document.getElementById('key-vis-btn');
-  if (inp.type === 'password') { inp.type = 'text'; btn.textContent = 'Hide'; }
-  else { inp.type = 'password'; btn.textContent = 'Show'; }
-}
-
 // ── CAMERA ──────────────────────────────────────────────────────
 async function startScanning() {
   try {
@@ -405,8 +388,6 @@ function updateInterval(v) {
 
 // ── CAPTURE ──────────────────────────────────────────────────────
 async function captureNow() {
-  const apiKey = document.getElementById('api-key').value.trim();
-  if (!apiKey) { log('No API key — enter key first', 'warn'); return; }
   const video = document.getElementById('video');
   if (!video.srcObject) { log('No camera feed', 'err'); return; }
 
@@ -431,7 +412,7 @@ async function captureNow() {
   scanCount++;
   document.getElementById('scan-count').textContent = scanCount + ' scan' + (scanCount !== 1 ? 's' : '');
 
-  await callVision(apiKey, b64);
+  await callVision(b64);
 }
 
 function triggerScanLine() {
@@ -442,67 +423,30 @@ function triggerScanLine() {
   setTimeout(() => el.classList.remove('active'), 2100);
 }
 
-// ── VISION API ────────────────────────────────────────────────────
-async function callVision(apiKey, b64) {
+// ── VISION API (proxied via server — uses API key from .env) ───────
+async function callVision(b64) {
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch('/api/vision', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 700,
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: b64 } },
-            { type: 'text', text: `You are an ambulance monitor OCR system. Analyze this image.
-
-If it shows a patient vitals monitor or any screen with medical numbers, extract all visible values.
-If it shows a printed page, photo of a monitor, or screen — extract the numbers from it.
-Be generous: try to extract anything that looks like HR, BP, SpO2, RR, temperature, or GCS.
-
-Respond ONLY with this exact JSON structure, no markdown, no explanation:
-{
-  "found": true,
-  "heartRate": null,
-  "bpSystolic": null,
-  "bpDiastolic": null,
-  "spo2": null,
-  "respiratoryRate": null,
-  "temperature": null,
-  "gcs": null,
-  "rawText": "any other numbers or text you can see on screen",
-  "confidence": {
-    "heartRate": "high",
-    "bpSystolic": "high",
-    "spo2": "high",
-    "respiratoryRate": "med",
-    "temperature": "med",
-    "gcs": "low"
-  },
-  "notes": "brief description of what you see in the image"
-}
-
-Use null for values you cannot find. Confidence: high = clearly visible, med = partially visible or inferred, low = guessed.` }
-          ]
-        }]
-      })
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imageBase64: b64, imageMime: 'image/jpeg' }),
     });
 
     if (!res.ok) {
-      const err = await res.json();
-      log('API error: ' + (err.error?.message || res.status), 'err');
+      const err = await res.json().catch(() => ({}));
+      const msg = err.error || err.message || res.status;
+      log('API error: ' + msg, 'err');
+      if (res.status === 500 && msg.includes('API key')) {
+        log('Check ANTHROPIC_API_KEY in your .env file', 'warn');
+      }
       setStatus('scanning', 'LIVE');
       return;
     }
 
-    const data = await res.json();
-    const text = data.content?.find(b => b.type === 'text')?.text || '{}';
-    const clean = text.replace(/```json|```/g, '').trim();
-    const result = JSON.parse(clean);
+    const result = await res.json();
     setStatus('scanning', 'LIVE');
     handleResult(result);
-  } catch(e) {
+  } catch (e) {
     log('Parse/network error: ' + e.message, 'err');
     setStatus('scanning', 'LIVE');
   }
