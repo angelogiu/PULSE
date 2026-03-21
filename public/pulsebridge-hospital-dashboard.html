@@ -538,7 +538,7 @@ updateClock();
 renderList();
 
 // ── SERVER CONNECTION ──────────────────────────────────────────
-const SERVER = 'pulse-production-3ea1.up.railway.app';
+const SERVER = 'https://pulse-production-3ea1.up.railway.app';
 const sock = io(SERVER, { query: { role: 'hospital' } });
 
 sock.on('connect', () => {
