@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pulse — Live CV Scanner</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0d0f14; --bg2: #13161e; --bg3: #1a1e28; --bg4: #0a0c10;
+    --border: rgba(255,255,255,0.07); --border2: rgba(255,255,255,0.13);
+    --text: #e8eaf0; --text2: #8b91a5; --text3: #555c70;
+    --ok: #3ddc84; --ok-bg: rgba(61,220,132,0.08);
+    --warn: #f5c518; --warn-bg: rgba(245,197,24,0.1);
+    --danger: #ff4d4d; --danger-bg: rgba(255,77,77,0.1);
+    --info: #4da6ff; --info-bg: rgba(77,166,255,0.1);
+    --font-mono: 'IBM Plex Mono', monospace;
+    --font-sans: 'DM Sans', sans-serif;
+  }
+  body { background: var(--bg); color: var(--text); font-family: var(--font-sans); min-height: 100vh; overflow-x: hidden; }
+
+  /* ── HEADER ── */
+  .header { display: flex; align-items: center; justify-content: space-between; padding: 0 24px; height: 52px; border-bottom: 1px solid var(--border); background: var(--bg2); }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo svg { width: 26px; height: 26px; }
+  .logo-text { font-family: var(--font-mono); font-size: 13px; letter-spacing: 0.08em; }
+  .logo-sub { font-size: 10px; color: var(--text3); letter-spacing: 0.1em; text-transform: uppercase; margin-top: 1px; }
+  .status-pill { display: flex; align-items: center; gap: 7px; padding: 5px 12px; border-radius: 3px; border: 1px solid var(--border2); font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.07em; }
+  .status-pill.idle { color: var(--text3); }
+  .status-pill.scanning { color: var(--ok); border-color: rgba(61,220,132,0.25); background: var(--ok-bg); }
+  .status-pill.processing { color: var(--info); border-color: rgba(77,166,255,0.25); background: var(--info-bg); }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .status-pill.scanning .status-dot { animation: blink 1.4s infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.2} }
+  .scan-count { font-family: var(--font-mono); font-size: 11px; color: var(--text3); }
+
+  /* ── LAYOUT ── */
+  .layout { display: grid; grid-template-columns: 1fr 340px; height: calc(100vh - 52px); }
+
+  /* ── LEFT: CAMERA ── */
+  .cam-side { display: flex; flex-direction: column; padding: 20px; gap: 16px; overflow-y: auto; }
+  .cam-wrap { position: relative; background: #000; border-radius: 8px; overflow: hidden; border: 1px solid var(--border2); flex-shrink: 0; }
+  #video { width: 100%; display: block; max-height: 420px; object-fit: cover; }
+  #canvas { display: none; }
+
+  /* scan line overlay */
+  .scan-line-wrap { position: absolute; inset: 0; pointer-events: none; overflow: hidden; border-radius: 8px; }
+  .scan-line { position: absolute; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent 0%, var(--info) 30%, #fff 50%, var(--info) 70%, transparent 100%); opacity: 0; }
+  .scan-line.active { animation: sweep 2s ease-in-out; }
+  @keyframes sweep { 0%{top:0%;opacity:0} 5%{opacity:.8} 50%{top:100%;opacity:.8} 95%{opacity:.3} 100%{top:100%;opacity:0} }
+
+  /* corner brackets */
+  .corner { position: absolute; width: 24px; height: 24px; border-color: var(--info); border-style: solid; opacity: 0.5; }
+  .corner.tl { top: 12px; left: 12px; border-width: 2px 0 0 2px; }
+  .corner.tr { top: 12px; right: 12px; border-width: 2px 2px 0 0; }
+  .corner.bl { bottom: 12px; left: 12px; border-width: 0 0 2px 2px; }
+  .corner.br { bottom: 12px; right: 12px; border-width: 0 2px 2px 0; }
+
+  /* bounding box detections overlaid on video */
+  .detect-overlay { position: absolute; inset: 0; pointer-events: none; }
+  .detect-box { position: absolute; border: 1.5px solid var(--ok); border-radius: 2px; }
+  .detect-label { position: absolute; top: -18px; left: 0; font-family: var(--font-mono); font-size: 10px; color: var(--ok); background: rgba(13,15,20,0.85); padding: 1px 6px; border-radius: 2px; white-space: nowrap; }
+
+  /* cam controls */
+  .cam-controls { display: flex; gap: 10px; flex-wrap: wrap; }
+  .btn { padding: 9px 18px; border-radius: 4px; font-family: var(--font-sans); font-size: 13px; font-weight: 500; cursor: pointer; transition: all .15s; border: 1px solid; }
+  .btn-start { background: var(--ok-bg); border-color: rgba(61,220,132,0.3); color: var(--ok); }
+  .btn-start:hover { background: rgba(61,220,132,0.15); }
+  .btn-stop { background: var(--danger-bg); border-color: rgba(255,77,77,0.3); color: var(--danger); }
+  .btn-stop:hover { background: rgba(255,77,77,0.15); }
+  .btn-ghost { background: transparent; border-color: var(--border2); color: var(--text2); }
+  .btn-ghost:hover { background: var(--bg3); color: var(--text); }
+  .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  /* interval selector */
+  .interval-row { display: flex; align-items: center; gap: 10px; }
+  .interval-row label { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; white-space: nowrap; }
+  .interval-row input[type=range] { flex: 1; accent-color: var(--info); }
+  .interval-val { font-family: var(--font-mono); font-size: 12px; color: var(--info); min-width: 40px; }
+
+  /* api key input */
+  .key-row { display: flex; gap: 8px; align-items: center; }
+  .key-row input { flex: 1; background: var(--bg3); border: 1px solid var(--border2); border-radius: 4px; color: var(--text); font-family: var(--font-mono); font-size: 12px; padding: 8px 12px; outline: none; }
+  .key-row input:focus { border-color: var(--info); }
+  .key-row input::placeholder { color: var(--text3); }
+  .key-label { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
+
+  /* last frame thumb */
+  .thumb-wrap { position: relative; border-radius: 6px; overflow: hidden; border: 1px solid var(--border); background: var(--bg4); }
+  .thumb-wrap img { width: 100%; display: block; max-height: 140px; object-fit: cover; }
+  .thumb-badge { position: absolute; bottom: 8px; right: 8px; font-family: var(--font-mono); font-size: 10px; background: rgba(0,0,0,0.75); color: var(--text2); padding: 2px 8px; border-radius: 2px; }
+
+  /* section */
+  .section-title { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--text3); margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+
+  /* log */
+  .log-list { display: flex; flex-direction: column; gap: 4px; max-height: 160px; overflow-y: auto; }
+  .log-item { display: flex; gap: 10px; align-items: baseline; padding: 4px 0; border-bottom: 1px solid var(--border); }
+  .log-time { font-family: var(--font-mono); font-size: 10px; color: var(--text3); flex-shrink: 0; }
+  .log-msg { font-size: 12px; color: var(--text2); line-height: 1.4; }
+  .log-msg.ok { color: var(--ok); }
+  .log-msg.warn { color: var(--warn); }
+  .log-msg.err { color: var(--danger); }
+  .log-msg.info { color: var(--info); }
+
+  /* ── RIGHT: VITALS PANEL ── */
+  .vitals-side { border-left: 1px solid var(--border); background: var(--bg2); display: flex; flex-direction: column; overflow-y: auto; }
+  .vitals-header { padding: 16px 20px 12px; border-bottom: 1px solid var(--border); }
+  .vitals-title { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text3); margin-bottom: 6px; }
+  .last-updated { font-size: 12px; color: var(--text2); }
+
+  .vitals-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 16px 16px 8px; }
+  .vital-card { background: var(--bg3); border-radius: 6px; padding: 12px 14px; position: relative; overflow: hidden; border: 1px solid var(--border); transition: border-color .3s; }
+  .vital-card.flash { animation: flash-update .5s ease-out; }
+  @keyframes flash-update { 0%{background:rgba(61,220,132,0.15);border-color:rgba(61,220,132,0.4)} 100%{background:var(--bg3);border-color:var(--border)} }
+  .vital-card.danger { border-color: rgba(255,77,77,0.35); }
+  .vital-card.warn { border-color: rgba(245,197,24,0.35); }
+  .vital-name { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text3); margin-bottom: 6px; }
+  .vital-val { font-family: var(--font-mono); font-size: 26px; font-weight: 500; line-height: 1; }
+  .vital-val.ok { color: var(--ok); }
+  .vital-val.warn { color: var(--warn); }
+  .vital-val.danger { color: var(--danger); }
+  .vital-val.none { color: var(--text3); font-size: 18px; }
+  .vital-unit { font-size: 11px; color: var(--text3); margin-top: 3px; }
+  .vital-conf { position: absolute; top: 8px; right: 10px; font-family: var(--font-mono); font-size: 9px; }
+  .vital-conf.high { color: var(--ok); }
+  .vital-conf.med { color: var(--warn); }
+  .vital-conf.low { color: var(--danger); }
+  .vital-trend { font-size: 11px; margin-top: 2px; }
+  .vital-trend.up { color: var(--warn); }
+  .vital-trend.down { color: var(--info); }
+
+  /* confidence bar */
+  .conf-bar { height: 2px; border-radius: 1px; margin-top: 6px; background: var(--border2); overflow: hidden; }
+  .conf-bar-fill { height: 100%; border-radius: 1px; transition: width .4s; }
+  .conf-bar-fill.high { background: var(--ok); width: 95%; }
+  .conf-bar-fill.med { background: var(--warn); width: 65%; }
+  .conf-bar-fill.low { background: var(--danger); width: 30%; }
+
+  /* severity badge */
+  .severity-section { padding: 0 16px 16px; }
+  .severity-display { border-radius: 6px; padding: 14px 16px; border: 1px solid; }
+  .severity-display.critical { background: var(--danger-bg); border-color: rgba(255,77,77,0.3); }
+  .severity-display.high { background: rgba(255,140,0,0.08); border-color: rgba(255,140,0,0.3); }
+  .severity-display.moderate { background: var(--warn-bg); border-color: rgba(245,197,24,0.3); }
+  .severity-display.low { background: var(--ok-bg); border-color: rgba(61,220,132,0.2); }
+  .severity-display.none { background: var(--bg3); border-color: var(--border); }
+  .sev-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text3); margin-bottom: 4px; }
+  .sev-val { font-family: var(--font-mono); font-size: 20px; font-weight: 500; }
+  .sev-val.critical { color: var(--danger); }
+  .sev-val.high { color: #ff8c00; }
+  .sev-val.moderate { color: var(--warn); }
+  .sev-val.low { color: var(--ok); }
+  .sev-val.none { color: var(--text3); }
+  .sev-recs { margin-top: 10px; display: flex; flex-direction: column; gap: 5px; }
+  .sev-rec { font-size: 11px; color: var(--text2); padding: 6px 10px; background: rgba(0,0,0,0.25); border-radius: 3px; border-left: 2px solid var(--info); line-height: 1.5; }
+
+  /* history sparkline */
+  .history-section { padding: 0 16px 16px; }
+  .sparkline-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .sparkline-label { font-size: 11px; color: var(--text2); min-width: 50px; font-family: var(--font-mono); }
+  .sparkline-wrap { flex: 1; height: 28px; }
+  .sparkline-wrap svg { width: 100%; height: 28px; display: block; }
+  .sparkline-latest { font-family: var(--font-mono); font-size: 11px; color: var(--text); min-width: 36px; text-align: right; }
+
+  /* send section */
+  .send-section { padding: 0 16px 20px; margin-top: auto; }
+  .btn-transmit { width: 100%; padding: 12px; background: var(--ok-bg); border: 1px solid rgba(61,220,132,0.3); color: var(--ok); font-family: var(--font-mono); font-size: 13px; letter-spacing: 0.05em; border-radius: 4px; cursor: pointer; transition: all .15s; }
+  .btn-transmit:hover { background: rgba(61,220,132,0.15); }
+  .btn-transmit:disabled { opacity: 0.3; cursor: not-allowed; }
+  .sent-toast { background: var(--ok-bg); border: 1px solid rgba(61,220,132,0.3); border-radius: 4px; padding: 10px 14px; font-family: var(--font-mono); font-size: 12px; color: var(--ok); margin-bottom: 10px; text-align: center; display: none; }
+
+  ::-webkit-scrollbar { width: 3px; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">
+    <svg viewBox="0 0 26 26" fill="none"><rect x="1" y="1" width="24" height="24" rx="4" stroke="#4da6ff" stroke-width="1.5"/><path d="M4 13h4l2-5.5 3 11 2-7 2 3.5h5" stroke="#ff4d4d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <div>
+      <div class="logo-text">PULSE</div>
+      <div class="logo-sub">Live CV Scanner</div>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:16px">
+    <div class="scan-count" id="scan-count">0 scans</div>
+    <div class="status-pill idle" id="status-pill">
+      <div class="status-dot"></div>
+      <span id="status-text">IDLE</span>
+    </div>
+  </div>
+</div>
+
+<div class="layout">
+
+  <!-- LEFT: CAMERA + LOG -->
+  <div class="cam-side">
+
+    <!-- API KEY -->
+    <div>
+      <div class="key-label">Anthropic API Key</div>
+      <div class="key-row">
+        <input type="password" id="api-key" placeholder="sk-ant-..." autocomplete="off">
+        <button class="btn btn-ghost" onclick="toggleKeyVis()" id="key-vis-btn" style="padding:8px 14px;font-size:12px">Show</button>
+      </div>
+    </div>
+
+    <!-- CAMERA FEED -->
+    <div class="cam-wrap" id="cam-wrap">
+      <video id="video" autoplay muted playsinline></video>
+      <canvas id="canvas"></canvas>
+      <div class="scan-line-wrap"><div class="scan-line" id="scan-line"></div></div>
+      <div class="corner tl"></div><div class="corner tr"></div>
+      <div class="corner bl"></div><div class="corner br"></div>
+      <div class="detect-overlay" id="detect-overlay"></div>
+    </div>
+
+    <!-- CONTROLS -->
+    <div class="cam-controls">
+      <button class="btn btn-start" id="btn-start" onclick="startScanning()">▶ Start Camera</button>
+      <button class="btn btn-stop" id="btn-stop" onclick="stopScanning()" disabled>■ Stop</button>
+      <button class="btn btn-ghost" onclick="captureNow()" id="btn-snap" disabled>⚡ Scan Now</button>
+      <button class="btn btn-ghost" onclick="switchCamera()" id="btn-switch" style="font-size:12px">⇄ Switch</button>
+    </div>
+
+    <!-- INTERVAL -->
+    <div class="interval-row">
+      <label>Scan every</label>
+      <input type="range" id="interval" min="3" max="30" step="1" value="8" oninput="updateInterval(this.value)">
+      <span class="interval-val" id="interval-val">8s</span>
+    </div>
+
+    <!-- LAST FRAME -->
+    <div id="last-frame-section" style="display:none">
+      <div class="section-title" style="margin-bottom:8px">Last Captured Frame</div>
+      <div class="thumb-wrap">
+        <img id="last-thumb" src="" alt="Last frame">
+        <div class="thumb-badge" id="thumb-badge">—</div>
+      </div>
+    </div>
+
+    <!-- LOG -->
+    <div>
+      <div class="section-title">Event Log</div>
+      <div class="log-list" id="log-list">
+        <div class="log-item"><span class="log-time">--:--</span><span class="log-msg">Ready — enter API key and start camera</span></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- RIGHT: VITALS + SEVERITY -->
+  <div class="vitals-side">
+
+    <div class="vitals-header">
+      <div class="vitals-title">Extracted Vitals</div>
+      <div class="last-updated" id="last-updated">Waiting for scan…</div>
+    </div>
+
+    <div class="vitals-grid">
+      <div class="vital-card" id="vc-hr">
+        <div class="vital-conf high" id="conf-hr">—</div>
+        <div class="vital-name">Heart Rate</div>
+        <div class="vital-val none" id="val-hr">—</div>
+        <div class="vital-unit">bpm</div>
+        <div class="vital-trend" id="trend-hr"></div>
+        <div class="conf-bar"><div class="conf-bar-fill" id="cbar-hr" style="width:0%"></div></div>
+      </div>
+      <div class="vital-card" id="vc-spo2">
+        <div class="vital-conf high" id="conf-spo2">—</div>
+        <div class="vital-name">SpO2</div>
+        <div class="vital-val none" id="val-spo2">—</div>
+        <div class="vital-unit">%</div>
+        <div class="vital-trend" id="trend-spo2"></div>
+        <div class="conf-bar"><div class="conf-bar-fill" id="cbar-spo2" style="width:0%"></div></div>
+      </div>
+      <div class="vital-card" id="vc-bp">
+        <div class="vital-conf high" id="conf-bp">—</div>
+        <div class="vital-name">Blood Pressure</div>
+        <div class="vital-val none" id="val-bp">—</div>
+        <div class="vital-unit">mmHg</div>
+        <div class="conf-bar"><div class="conf-bar-fill" id="cbar-bp" style="width:0%"></div></div>
+      </div>
+      <div class="vital-card" id="vc-rr">
+        <div class="vital-conf high" id="conf-rr">—</div>
+        <div class="vital-name">Resp Rate</div>
+        <div class="vital-val none" id="val-rr">—</div>
+        <div class="vital-unit">/min</div>
+        <div class="vital-trend" id="trend-rr"></div>
+        <div class="conf-bar"><div class="conf-bar-fill" id="cbar-rr" style="width:0%"></div></div>
+      </div>
+      <div class="vital-card" id="vc-temp">
+        <div class="vital-conf high" id="conf-temp">—</div>
+        <div class="vital-name">Temperature</div>
+        <div class="vital-val none" id="val-temp">—</div>
+        <div class="vital-unit">°C</div>
+        <div class="conf-bar"><div class="conf-bar-fill" id="cbar-temp" style="width:0%"></div></div>
+      </div>
+      <div class="vital-card" id="vc-gcs">
+        <div class="vital-conf high" id="conf-gcs">—</div>
+        <div class="vital-name">GCS</div>
+        <div class="vital-val none" id="val-gcs">—</div>
+        <div class="vital-unit">/15</div>
+        <div class="conf-bar"><div class="conf-bar-fill" id="cbar-gcs" style="width:0%"></div></div>
+      </div>
+    </div>
+
+    <!-- SEVERITY -->
+    <div class="severity-section">
+      <div class="section-title">Risk Assessment</div>
+      <div class="severity-display none" id="severity-display">
+        <div class="sev-label">Severity</div>
+        <div class="sev-val none" id="sev-val">AWAITING DATA</div>
+        <div class="sev-recs" id="sev-recs"></div>
+      </div>
+    </div>
+
+    <!-- SPARKLINES -->
+    <div class="history-section">
+      <div class="section-title">Trend (last 10 scans)</div>
+      <div id="sparklines">
+        <div class="sparkline-row"><span class="sparkline-label">HR</span><div class="sparkline-wrap" id="spark-hr"></div><span class="sparkline-latest" id="slat-hr">—</span></div>
+        <div class="sparkline-row"><span class="sparkline-label">SpO2</span><div class="sparkline-wrap" id="spark-spo2"></div><span class="sparkline-latest" id="slat-spo2">—</span></div>
+        <div class="sparkline-row"><span class="sparkline-label">BP sys</span><div class="sparkline-wrap" id="spark-bp"></div><span class="sparkline-latest" id="slat-bp">—</span></div>
+      </div>
+    </div>
+
+    <!-- TRANSMIT -->
+    <div class="send-section">
+      <div class="sent-toast" id="sent-toast">✓ Encounter transmitted to hospital</div>
+      <button class="btn-transmit" id="btn-transmit" onclick="transmit()" disabled>→ TRANSMIT TO HOSPITAL</button>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ── STATE ──────────────────────────────────────────────────────
+let stream = null;
+let scanInterval = null;
+let intervalSecs = 8;
+let scanCount = 0;
+let isScanning = false;
+let hasData = false;
+let facingMode = 'environment'; // rear cam by default
+let history = { hr: [], spo2: [], bp: [] };
+
+// ── KEY VIS ─────────────────────────────────────────────────────
+function toggleKeyVis() {
+  const inp = document.getElementById('api-key');
+  const btn = document.getElementById('key-vis-btn');
+  if (inp.type === 'password') { inp.type = 'text'; btn.textContent = 'Hide'; }
+  else { inp.type = 'password'; btn.textContent = 'Show'; }
+}
+
+// ── CAMERA ──────────────────────────────────────────────────────
+async function startScanning() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
+      audio: false
+    });
+    document.getElementById('video').srcObject = stream;
+    document.getElementById('btn-start').disabled = true;
+    document.getElementById('btn-stop').disabled = false;
+    document.getElementById('btn-snap').disabled = false;
+    setStatus('scanning', 'LIVE');
+    log('Camera started', 'ok');
+    scheduleNext();
+  } catch(e) {
+    log('Camera error: ' + e.message, 'err');
+  }
+}
+
+function stopScanning() {
+  clearTimeout(scanInterval);
+  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+  document.getElementById('video').srcObject = null;
+  document.getElementById('btn-start').disabled = false;
+  document.getElementById('btn-stop').disabled = true;
+  document.getElementById('btn-snap').disabled = true;
+  setStatus('idle', 'IDLE');
+  log('Scanning stopped', 'warn');
+  isScanning = false;
+}
+
+async function switchCamera() {
+  facingMode = facingMode === 'environment' ? 'user' : 'environment';
+  if (stream) { stopScanning(); await startScanning(); }
+}
+
+function scheduleNext() {
+  clearTimeout(scanInterval);
+  scanInterval = setTimeout(() => { captureNow(); scheduleNext(); }, intervalSecs * 1000);
+}
+
+function updateInterval(v) {
+  intervalSecs = parseInt(v);
+  document.getElementById('interval-val').textContent = v + 's';
+  if (stream) scheduleNext();
+}
+
+// ── CAPTURE ──────────────────────────────────────────────────────
+async function captureNow() {
+  const apiKey = document.getElementById('api-key').value.trim();
+  if (!apiKey) { log('No API key — enter key first', 'warn'); return; }
+  const video = document.getElementById('video');
+  if (!video.srcObject) { log('No camera feed', 'err'); return; }
+
+  const canvas = document.getElementById('canvas');
+  canvas.width = video.videoWidth || 640;
+  canvas.height = video.videoHeight || 480;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+  const b64 = dataUrl.split(',')[1];
+
+  // Show thumb
+  const thumb = document.getElementById('last-thumb');
+  thumb.src = dataUrl;
+  document.getElementById('last-frame-section').style.display = 'block';
+  document.getElementById('thumb-badge').textContent = nowStr();
+
+  triggerScanLine();
+  setStatus('processing', 'SCANNING');
+  log('Frame captured — sending to Claude Vision…', 'info');
+  scanCount++;
+  document.getElementById('scan-count').textContent = scanCount + ' scan' + (scanCount !== 1 ? 's' : '');
+
+  await callVision(apiKey, b64);
+}
+
+function triggerScanLine() {
+  const el = document.getElementById('scan-line');
+  el.classList.remove('active');
+  void el.offsetWidth;
+  el.classList.add('active');
+  setTimeout(() => el.classList.remove('active'), 2100);
+}
+
+// ── VISION API ────────────────────────────────────────────────────
+async function callVision(apiKey, b64) {
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 700,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: b64 } },
+            { type: 'text', text: `You are an ambulance monitor OCR system. Analyze this image.
+
+If it shows a patient vitals monitor or any screen with medical numbers, extract all visible values.
+If it shows a printed page, photo of a monitor, or screen — extract the numbers from it.
+Be generous: try to extract anything that looks like HR, BP, SpO2, RR, temperature, or GCS.
+
+Respond ONLY with this exact JSON structure, no markdown, no explanation:
+{
+  "found": true,
+  "heartRate": null,
+  "bpSystolic": null,
+  "bpDiastolic": null,
+  "spo2": null,
+  "respiratoryRate": null,
+  "temperature": null,
+  "gcs": null,
+  "rawText": "any other numbers or text you can see on screen",
+  "confidence": {
+    "heartRate": "high",
+    "bpSystolic": "high",
+    "spo2": "high",
+    "respiratoryRate": "med",
+    "temperature": "med",
+    "gcs": "low"
+  },
+  "notes": "brief description of what you see in the image"
+}
+
+Use null for values you cannot find. Confidence: high = clearly visible, med = partially visible or inferred, low = guessed.` }
+          ]
+        }]
+      })
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      log('API error: ' + (err.error?.message || res.status), 'err');
+      setStatus('scanning', 'LIVE');
+      return;
+    }
+
+    const data = await res.json();
+    const text = data.content?.find(b => b.type === 'text')?.text || '{}';
+    const clean = text.replace(/```json|```/g, '').trim();
+    const result = JSON.parse(clean);
+    setStatus('scanning', 'LIVE');
+    handleResult(result);
+  } catch(e) {
+    log('Parse/network error: ' + e.message, 'err');
+    setStatus('scanning', 'LIVE');
+  }
+}
+
+// ── HANDLE RESULT ────────────────────────────────────────────────
+const prev = {};
+
+function handleResult(r) {
+  if (!r.found) {
+    log('No monitor detected in frame — ' + (r.notes || 'try pointing at a screen'), 'warn');
+    return;
+  }
+
+  const c = r.confidence || {};
+  log(`Scan OK — ${r.notes || 'values extracted'}`, 'ok');
+  if (r.rawText) log('Raw text: ' + r.rawText.slice(0, 80), 'info');
+
+  updateVital('hr',   'val-hr',   'conf-hr',   'cbar-hr',   'vc-hr',   r.heartRate,        c.heartRate,       'bpm',   vClass('hr', r.heartRate),   'trend-hr');
+  updateVital('spo2', 'val-spo2', 'conf-spo2', 'cbar-spo2', 'vc-spo2', r.spo2,             c.spo2,            '%',     vClass('spo2', r.spo2),      'trend-spo2');
+  updateVital('rr',   'val-rr',   'conf-rr',   'cbar-rr',   'vc-rr',   r.respiratoryRate,  c.respiratoryRate, '/min',  vClass('rr', r.respiratoryRate), 'trend-rr');
+  updateVital('temp', 'val-temp', 'conf-temp', 'cbar-temp', 'vc-temp', r.temperature,      c.temperature,     '°C',    'ok', null);
+  updateVital('gcs',  'val-gcs',  'conf-gcs',  'cbar-gcs',  'vc-gcs',  r.gcs,              c.gcs,             '/15',   vClass('gcs', r.gcs),        null);
+
+  // BP special case
+  const bpVal = r.bpSystolic && r.bpDiastolic ? `${r.bpSystolic}/${r.bpDiastolic}` : r.bpSystolic ? `${r.bpSystolic}` : null;
+  updateVital('bp', 'val-bp', 'conf-bp', 'cbar-bp', 'vc-bp', bpVal, c.bpSystolic, 'mmHg', vClass('bp', r.bpSystolic), null);
+
+  document.getElementById('last-updated').textContent = 'Updated ' + nowStr();
+
+  // History
+  if (r.heartRate)       { history.hr.push(r.heartRate); if (history.hr.length > 10) history.hr.shift(); }
+  if (r.spo2)            { history.spo2.push(r.spo2); if (history.spo2.length > 10) history.spo2.shift(); }
+  if (r.bpSystolic)      { history.bp.push(r.bpSystolic); if (history.bp.length > 10) history.bp.shift(); }
+  renderSparklines();
+
+  // Score severity
+  const score = scoreRisk(r);
+  renderSeverity(score);
+
+  hasData = true;
+  document.getElementById('btn-transmit').disabled = false;
+
+  // Draw bounding box hints
+  renderDetections(r);
+}
+
+function updateVital(key, valId, confId, cbarId, cardId, val, conf, unit, cls, trendId) {
+  const card = document.getElementById(cardId);
+  const valEl = document.getElementById(valId);
+  const confEl = document.getElementById(confId);
+  const cbar = document.getElementById(cbarId);
+
+  const display = val != null ? String(val) : '—';
+  const changed = display !== valEl.textContent;
+
+  valEl.textContent = display;
+  valEl.className = 'vital-val ' + (val != null ? (cls || 'ok') : 'none');
+
+  if (conf) {
+    confEl.textContent = conf === 'high' ? '●' : conf === 'med' ? '◐' : '○';
+    confEl.className = 'vital-conf ' + conf;
+    cbar.className = 'conf-bar-fill ' + conf;
+  }
+
+  // Status border
+  card.classList.remove('danger','warn');
+  if (cls === 'danger') card.classList.add('danger');
+  else if (cls === 'warn') card.classList.add('warn');
+
+  // Flash on change
+  if (changed && val != null) {
+    card.classList.remove('flash');
+    void card.offsetWidth;
+    card.classList.add('flash');
+  }
+
+  // Trend arrow
+  if (trendId && val != null && prev[key] != null) {
+    const tEl = document.getElementById(trendId);
+    if (val > prev[key] + 1) { tEl.textContent = '↑ ' + val; tEl.className = 'vital-trend up'; }
+    else if (val < prev[key] - 1) { tEl.textContent = '↓ ' + val; tEl.className = 'vital-trend down'; }
+    else { tEl.textContent = ''; }
+  }
+  if (val != null) prev[key] = val;
+}
+
+function vClass(key, val) {
+  if (val == null) return 'none';
+  if (key === 'hr') return val > 120 ? 'danger' : val > 100 ? 'warn' : val < 50 ? 'danger' : 'ok';
+  if (key === 'spo2') return val < 90 ? 'danger' : val < 95 ? 'warn' : 'ok';
+  if (key === 'rr') return val > 25 ? 'danger' : val > 20 ? 'warn' : 'ok';
+  if (key === 'bp') return val < 90 ? 'danger' : val > 180 ? 'warn' : 'ok';
+  if (key === 'gcs') return val < 9 ? 'danger' : val < 14 ? 'warn' : 'ok';
+  return 'ok';
+}
+
+// ── SPARKLINES ────────────────────────────────────────────────────
+function renderSparklines() {
+  const groups = [
+    { id: 'spark-hr', latId: 'slat-hr', data: history.hr, color: '#3ddc84' },
+    { id: 'spark-spo2', latId: 'slat-spo2', data: history.spo2, color: '#4da6ff' },
+    { id: 'spark-bp', latId: 'slat-bp', data: history.bp, color: '#f5c518' },
+  ];
+  groups.forEach(g => {
+    const wrap = document.getElementById(g.id);
+    if (!g.data.length) return;
+    const lat = g.data[g.data.length - 1];
+    document.getElementById(g.latId).textContent = lat;
+    const w = wrap.offsetWidth || 160, h = 28;
+    const min = Math.min(...g.data) - 5;
+    const max = Math.max(...g.data) + 5;
+    const pts = g.data.map((v, i) => {
+      const x = g.data.length === 1 ? w / 2 : (i / (g.data.length - 1)) * w;
+      const y = h - ((v - min) / (max - min)) * (h - 4) - 2;
+      return `${x},${y}`;
+    }).join(' ');
+    wrap.innerHTML = `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+      <polyline points="${pts}" fill="none" stroke="${g.color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>
+      ${g.data.map((v,i) => {
+        const x = g.data.length === 1 ? w/2 : (i/(g.data.length-1))*w;
+        const y = h - ((v-min)/(max-min))*(h-4) - 2;
+        return i === g.data.length-1 ? `<circle cx="${x}" cy="${y}" r="2.5" fill="${g.color}"/>` : '';
+      }).join('')}
+    </svg>`;
+  });
+}
+
+// ── RISK SCORING ──────────────────────────────────────────────────
+function scoreRisk(v) {
+  let score = 0; const recs = [];
+  if (v.spo2 != null) { if (v.spo2 < 90) { score += 3; recs.push('Prepare respiratory support — SpO2 critical'); } else if (v.spo2 < 95) { score += 1; recs.push('SpO2 below normal — monitor closely'); } }
+  if (v.bpSystolic != null) { if (v.bpSystolic < 90) { score += 3; recs.push('Hypotension — IV access, fluid bolus'); } else if (v.bpSystolic > 180) { score += 1; recs.push('Hypertension — stroke/cardiac risk'); } }
+  if (v.heartRate != null) { if (v.heartRate > 120) { score += 2; recs.push('Tachycardia — 12-lead ECG'); } else if (v.heartRate < 50) { score += 2; recs.push('Bradycardia — pacing may be needed'); } }
+  if (v.gcs != null && v.gcs < 9) { score += 3; recs.push('GCS < 9 — airway management'); }
+  if (v.respiratoryRate != null && v.respiratoryRate > 25) { score += 2; recs.push('High RR — respiratory compromise'); }
+  const level = score >= 6 ? 'critical' : score >= 3 ? 'high' : score >= 1 ? 'moderate' : 'low';
+  if (!recs.length) recs.push('Vitals within acceptable range');
+  return { level, recs };
+}
+
+function renderSeverity({ level, recs }) {
+  const disp = document.getElementById('severity-display');
+  const val = document.getElementById('sev-val');
+  disp.className = 'severity-display ' + level;
+  val.className = 'sev-val ' + level;
+  val.textContent = level.toUpperCase();
+  document.getElementById('sev-recs').innerHTML = recs.map(r => `<div class="sev-rec">→ ${r}</div>`).join('');
+}
+
+// ── BOUNDING BOX HINTS ────────────────────────────────────────────
+function renderDetections(r) {
+  const ov = document.getElementById('detect-overlay');
+  // Simulated regions — in production a dedicated YOLO/CV model would return real coords
+  const regions = [];
+  if (r.heartRate != null) regions.push({ label: 'HR: ' + r.heartRate, top:'12%', left:'5%', w:'22%', h:'18%' });
+  if (r.spo2 != null) regions.push({ label: 'SpO2: ' + r.spo2 + '%', top:'12%', left:'72%', w:'22%', h:'18%' });
+  if (r.bpSystolic != null) regions.push({ label: 'BP: ' + r.bpSystolic + '/' + (r.bpDiastolic||'?'), top:'38%', left:'5%', w:'28%', h:'18%' });
+  if (r.respiratoryRate != null) regions.push({ label: 'RR: ' + r.respiratoryRate, top:'62%', left:'5%', w:'22%', h:'16%' });
+  ov.innerHTML = regions.map(r => `
+    <div class="detect-box" style="top:${r.top};left:${r.left};width:${r.w};height:${r.h}">
+      <span class="detect-label">${r.label}</span>
+    </div>`).join('');
+  setTimeout(() => { ov.innerHTML = ''; }, 4000);
+}
+
+// ── TRANSMIT ──────────────────────────────────────────────────────
+function transmit() {
+  const toast = document.getElementById('sent-toast');
+  toast.style.display = 'block';
+  log('Encounter transmitted — ENC-' + Date.now().toString(36).toUpperCase(), 'ok');
+  setTimeout(() => { toast.style.display = 'none'; }, 3500);
+}
+
+// ── HELPERS ──────────────────────────────────────────────────────
+function setStatus(cls, text) {
+  const p = document.getElementById('status-pill');
+  p.className = 'status-pill ' + cls;
+  document.getElementById('status-text').textContent = text;
+}
+
+function nowStr() {
+  return new Date().toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+function log(msg, cls) {
+  const list = document.getElementById('log-list');
+  const item = document.createElement('div');
+  item.className = 'log-item';
+  item.innerHTML = `<span class="log-time">${nowStr()}</span><span class="log-msg ${cls||''}">${msg}</span>`;
+  list.prepend(item);
+  while (list.children.length > 30) list.removeChild(list.lastChild);
+}
+</script>
+</body>
+</html>
