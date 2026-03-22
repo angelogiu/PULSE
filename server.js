@@ -86,6 +86,16 @@ app.patch('/api/encounters/:id', (req, res) => {
   res.json({ ok: true, encounter: enc });
 });
 
+// DELETE /api/encounters/:id — remove patient from board
+app.delete('/api/encounters/:id', (req, res) => {
+  const enc = encounters.get(req.params.id);
+  if (!enc) return res.status(404).json({ error: 'Not found' });
+  encounters.delete(req.params.id);
+  io.emit('patient:removed', { encounterId: req.params.id });
+  console.log(`[REMOVE]  ${req.params.id} removed`);
+  res.json({ ok: true });
+});
+
 // GET /api/encounters — initial load for hospital dashboard
 app.get('/api/encounters', (req, res) => {
   res.json([...encounters.values()].filter(e => e.status === 'active'));

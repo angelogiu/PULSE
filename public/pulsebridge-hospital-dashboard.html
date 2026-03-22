@@ -733,6 +733,7 @@ function openPatient(id){
     </div>
 
     <button class="ack-btn-notion ${acked?'acked':''}" onclick="toggleAck('${p.id}')">${acked?'✓ Acknowledged — click to unack':'Acknowledge & prepare bay →'}</button>
+    <button class="ack-btn-notion" style="margin-top:4px;background:var(--r-bg);color:var(--r-text)" onclick="removePatient('${p.id}')">Remove patient from board</button>
 
     <div class="prop-divider"></div>
     <div class="pp-section"><div class="pp-section-lbl">Timeline</div></div>
@@ -746,6 +747,18 @@ function toggleAck(id){
   ackedMap[id]=!ackedMap[id];
   const p=patients.find(x=>x.id===id);if(p)p.acked=ackedMap[id];
   openPatient(id);renderTable();updateMetrics();
+}
+
+async function removePatient(encId){
+  if(!confirm('Remove this patient from the board?'))return;
+  const res=await fetch(`/api/encounters/${encId}`,{method:'DELETE'});
+  if(!res.ok)return;
+  const idx=patients.findIndex(x=>x.id===encId);
+  if(idx>=0)patients.splice(idx,1);
+  delete ackedMap[encId];
+  selId=null;
+  document.getElementById('prop-panel').innerHTML=`<div class="pp-empty"><svg width="40" height="40" viewBox="0 0 40 40" fill="none"><rect x="2" y="2" width="36" height="36" rx="8" stroke="currentColor" stroke-width="1.5"/><path d="M10 20h8l3-7 4 14 3-9 2 4h2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Select a row to open patient details</span></div>`;
+  renderTable();updateMetrics();updateAlertsList();updateBayGrid();
 }
 
 async function assignBay(encId,bay){
@@ -787,6 +800,13 @@ sock.on('encounters:init',(inc)=>{inc.forEach(mergeEnc);renderTable();updateMetr
 sock.on('patient:update',(enc)=>{
   mergeEnc(enc);renderTable();updateMetrics();updateAlertsList();updateBayGrid();
   if(selId===enc.encounterId)openPatient(enc.encounterId);
+});
+sock.on('patient:removed',({encounterId})=>{
+  const idx=patients.findIndex(x=>x.id===encounterId);
+  if(idx>=0)patients.splice(idx,1);
+  delete ackedMap[encounterId];
+  if(selId===encounterId){selId=null;document.getElementById('prop-panel').innerHTML=`<div class="pp-empty"><svg width="40" height="40" viewBox="0 0 40 40" fill="none"><rect x="2" y="2" width="36" height="36" rx="8" stroke="currentColor" stroke-width="1.5"/><path d="M10 20h8l3-7 4 14 3-9 2 4h2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Select a row to open patient details</span></div>`;}
+  renderTable();updateMetrics();updateAlertsList();updateBayGrid();
 });
 
 function mergeEnc(enc){
