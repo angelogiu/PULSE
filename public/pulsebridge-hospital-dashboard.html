@@ -95,8 +95,11 @@ body{background:var(--n-bg);color:var(--n-text);font-family:var(--font);font-siz
 .filter-chip:not(.active){color:var(--n-text2);background:transparent}
 .filter-chip:hover{background:var(--n-hover)}
 
-/* CONTENT SPLIT */
-.content{flex:1;display:grid;grid-template-columns:1fr 340px;overflow:hidden;min-height:0}
+/* PAGE ER — flex to fill main, constrain content for scroll */
+#page-er{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+/* CONTENT SPLIT — grid row constrained so prop-panel can scroll */
+.content{flex:1;min-height:0;display:grid;grid-template-columns:1fr 340px;grid-template-rows:minmax(0,1fr);overflow:hidden}
+.content>*{min-height:0}
 
 /* ─── DATABASE TABLE ─────────────────────── */
 .db-col{overflow-y:auto;padding:0 60px 40px}
@@ -132,7 +135,8 @@ body{background:var(--n-bg);color:var(--n-text);font-family:var(--font);font-siz
 .db-new-row svg{width:13px;height:13px}
 
 /* ─── PROPERTY PANEL (Notion right panel) ── */
-.prop-panel{border-left:1px solid var(--n-border);background:var(--n-bg);overflow-y:auto;display:flex;flex-direction:column}
+.prop-panel{border-left:1px solid var(--n-border);background:var(--n-bg);display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.pp-scroll{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
 .pp-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:8px;color:var(--n-text3);font-size:13px;text-align:center;padding:32px}
 .pp-empty svg{opacity:.3}
 .pp-header{padding:20px 20px 12px;border-bottom:1px solid var(--n-border)}
@@ -663,12 +667,12 @@ function openPatient(id){
   const sexLbl=p.sex==='M'?'Male':p.sex==='F'?'Female':'Unknown';
   const acked=ackedMap[p.id];
   document.getElementById('prop-panel').innerHTML=`
-    <div class="pp-header">
+    <div class="pp-header" style="flex-shrink:0">
       <div class="pp-page-icon">${sv.icon}</div>
       <div class="pp-title">${p.complaint}</div>
       <div class="pp-subtitle">${p.id} · ${p.ambulance} · Updated just now</div>
     </div>
-
+    <div class="pp-scroll">
     <div class="pp-props">
       <div class="prop-row">
         <div class="prop-key"><svg viewBox="0 0 13 13" fill="none"><circle cx="6.5" cy="6.5" r="5" stroke="currentColor" stroke-width="1.2"/><path d="M6.5 3.5v3l2 1" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>Status</div>
@@ -739,6 +743,7 @@ function openPatient(id){
     <div class="pp-section"><div class="pp-section-lbl">Timeline</div></div>
     <div class="tl-block">
       ${p.timeline.map(t=>`<div class="tl-row"><div class="tl-dot2 ${t.type}"></div><div class="tl-body"><div class="tl-ev">${t.event}</div><div class="tl-det">${t.detail}</div></div><div class="tl-t">${t.time}</div></div>`).join('')}
+    </div>
     </div>
   `;
 }
