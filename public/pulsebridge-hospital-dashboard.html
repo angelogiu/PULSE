@@ -357,6 +357,7 @@ body{background:var(--n-bg);color:var(--n-text);font-family:var(--font);font-siz
             <th class="db-th">Age / Sex</th>
             <th class="db-th">Vitals</th>
             <th class="db-th">ETA</th>
+            <th class="db-th">Bay</th>
             <th class="db-th">Status</th>
           </tr>
         </thead>
@@ -520,6 +521,37 @@ function goPage(page,el){
     document.getElementById('page-desc').textContent=cfg.desc;
   }
   if(page==='alerts')updateAlertsList();
+  if(page==='bays')updateBayGrid();
+}
+
+function updateBayGrid(){
+  const grid=document.getElementById('bay-grid');
+  if(!grid)return;
+  const occupied={};
+  patients.forEach(p=>{if(p.bay)occupied[p.bay]=p;});
+  const bays=[1,2,3,4,5,6,7,8];
+  let avail=0;
+  grid.innerHTML=bays.map(n=>{
+    const label=`Bay ${n}`;
+    const p=occupied[label];
+    if(p){
+      return`<div class="bay-card n-tag gray" data-bay="${label}" style="padding:12px;cursor:pointer">
+        <div style="font-weight:600;margin-bottom:4px">${label} — Occupied</div>
+        <div style="font-size:12px">${p.id} · ${p.complaint}</div>
+        <button class="modal-btn ghost" style="margin-top:8px;padding:4px 8px;font-size:11px" onclick="event.stopPropagation();assignBay('${p.id}','')">Unassign</button>
+      </div>`;
+    }
+    avail++;
+    return`<div class="bay-card n-tag green" data-bay="${label}" style="padding:12px">
+      <div style="font-weight:600;margin-bottom:6px">${label} — Available</div>
+      <select onchange="assignBay(this.value,'${label}')" style="width:100%;padding:6px;border-radius:4px;border:1px solid var(--n-border);font-size:12px;background:white">
+        <option value="">Assign patient…</option>${patients.filter(x=>!x.bay).map(x=>`<option value="${x.id}">${x.id} — ${x.complaint}</option>`).join('')}
+        ${patients.filter(x=>!x.bay).length===0?'<option value="" disabled>No unassigned patients</option>':''}
+      </select>
+    </div>`;
+  }).join('');
+  const sbBays=document.getElementById('sb-bays');
+  if(sbBays)sbBays.textContent=`${8-avail}/8`;
 }
 
 function openAddModal(){
@@ -568,9 +600,9 @@ function updateAlertsList(){
 const patients=[
   {id:'ENC-2847',ambulance:'AMB-04',eta:3,age:62,sex:'M',complaint:'Chest Pain / STEMI',severity:'critical',category:'Cardiac',conscious:true,breathing:'labored',vitals:{hr:112,bp:'92/60',spo2:91,rr:22,temp:37.2,gcs:14},notes:'Onset 45 min ago. Diaphoretic. Hx of MI 2019.',symptoms:['Chest Pain','Diaphoresis','SOB'],acked:false,actions:[{type:'urgent',title:'Activate cath lab immediately',detail:'STEMI pattern on field ECG'},{type:'urgent',title:'Prepare dual antiplatelet therapy',detail:'Aspirin + Ticagrelor'},{type:'warn',title:'Trauma bay on standby',detail:'Patient may deteriorate en route'},{type:'info',title:'Cardiology consult required',detail:'Contact on-call cardiologist now'}],timeline:[{time:'09:42',event:'Intake received',detail:'ENC-2847 by AMB-04',type:'info'},{time:'09:43',event:'Risk scored: CRITICAL',detail:'STEMI indicators detected',type:'critical'},{time:'09:45',event:'Vitals updated',detail:'HR 112, BP 92/60, SpO2 91%',type:'warn'}]},
   {id:'ENC-2846',ambulance:'AMB-07',eta:6,age:34,sex:'F',complaint:'MVA — Head Trauma',severity:'critical',category:'Trauma',conscious:false,breathing:'assisted',vitals:{hr:98,bp:'140/88',spo2:94,rr:18,temp:36.8,gcs:8},notes:'Unrestrained passenger. Loss of consciousness at scene.',symptoms:['Head Trauma','Unconscious'],acked:false,actions:[{type:'urgent',title:'Prepare CT — head/C-spine',detail:'GCS 8, high-risk mechanism'},{type:'urgent',title:'Trauma team activation',detail:'Level 1 criteria met'},{type:'warn',title:'Neurosurgery on standby',detail:'Possible intracranial bleed'}],timeline:[{time:'09:38',event:'Intake received',detail:'ENC-2846 by AMB-07',type:'info'},{time:'09:43',event:'GCS updated',detail:'Dropped 10→8',type:'critical'}]},
-  {id:'ENC-2845',ambulance:'AMB-02',eta:9,age:78,sex:'F',complaint:'Stroke Symptoms',severity:'high',category:'Neuro',conscious:true,breathing:'normal',vitals:{hr:88,bp:'182/104',spo2:97,rr:16,temp:36.9,gcs:14},notes:'FAST positive. L-sided facial droop ~35 min ago.',symptoms:['Facial Droop','Slurred Speech'],acked:true,actions:[{type:'urgent',title:'Code stroke — CT angio NOW',detail:'Within tPA window'},{type:'warn',title:'tPA eligibility assessment',detail:'BP 182/104 borderline'},{type:'info',title:'Neurology consult',detail:'Stroke team paged'}],timeline:[{time:'09:22',event:'Intake received',detail:'ENC-2845 by AMB-02',type:'info'},{time:'09:30',event:'Acknowledged',detail:'Acked by Dr. Reyes',type:'ok'}]},
+  {id:'ENC-2845',ambulance:'AMB-02',eta:9,age:78,sex:'F',complaint:'Stroke Symptoms',severity:'high',category:'Neuro',conscious:true,breathing:'normal',vitals:{hr:88,bp:'182/104',spo2:97,rr:16,temp:36.9,gcs:14},notes:'FAST positive. L-sided facial droop ~35 min ago.',symptoms:['Facial Droop','Slurred Speech'],acked:true,bay:'Bay 2',actions:[{type:'urgent',title:'Code stroke — CT angio NOW',detail:'Within tPA window'},{type:'warn',title:'tPA eligibility assessment',detail:'BP 182/104 borderline'},{type:'info',title:'Neurology consult',detail:'Stroke team paged'}],timeline:[{time:'09:22',event:'Intake received',detail:'ENC-2845 by AMB-02',type:'info'},{time:'09:30',event:'Acknowledged',detail:'Acked by Dr. Reyes',type:'ok'}]},
   {id:'ENC-2844',ambulance:'AMB-09',eta:14,age:45,sex:'M',complaint:'Respiratory Distress',severity:'high',category:'Respiratory',conscious:true,breathing:'labored',vitals:{hr:104,bp:'128/80',spo2:88,rr:28,temp:38.4,gcs:15},notes:'Hx of asthma. Salbutamol x2 partial response.',symptoms:['SOB','Wheeze'],acked:false,actions:[{type:'urgent',title:'Respiratory support ready',detail:'SpO2 88%'},{type:'warn',title:'Prepare bronchodilators',detail:'Partial response noted'}],timeline:[{time:'09:35',event:'Intake received',detail:'ENC-2844 by AMB-09',type:'info'},{time:'09:36',event:'Risk scored: HIGH',detail:'SpO2 88%, RR 28',type:'warn'}]},
-  {id:'ENC-2843',ambulance:'AMB-11',eta:18,age:29,sex:'M',complaint:'Laceration — Forearm',severity:'moderate',category:'Trauma',conscious:true,breathing:'normal',vitals:{hr:82,bp:'118/74',spo2:99,rr:14,temp:36.7,gcs:15},notes:'Deep laceration. Bleeding controlled.',symptoms:['Laceration'],acked:true,actions:[{type:'info',title:'Surgical consult for tendon',detail:'Deep palmar laceration'},{type:'info',title:'Tetanus booster',detail:'Wound contamination'}],timeline:[{time:'09:28',event:'Intake received',detail:'ENC-2843 by AMB-11',type:'info'},{time:'09:35',event:'Acknowledged',detail:'Bay 6 assigned',type:'ok'}]},
+  {id:'ENC-2843',ambulance:'AMB-11',eta:18,age:29,sex:'M',complaint:'Laceration — Forearm',severity:'moderate',category:'Trauma',conscious:true,breathing:'normal',vitals:{hr:82,bp:'118/74',spo2:99,rr:14,temp:36.7,gcs:15},notes:'Deep laceration. Bleeding controlled.',symptoms:['Laceration'],acked:true,bay:'Bay 6',actions:[{type:'info',title:'Surgical consult for tendon',detail:'Deep palmar laceration'},{type:'info',title:'Tetanus booster',detail:'Wound contamination'}],timeline:[{time:'09:28',event:'Intake received',detail:'ENC-2843 by AMB-11',type:'info'},{time:'09:35',event:'Acknowledged',detail:'Bay 6 assigned',type:'ok'}]},
 ];
 let selId=null,filter='all';
 const ackedMap={};
@@ -610,6 +642,7 @@ function renderTable(){
       <td class="db-td muted">${p.age}y / ${sexLbl}</td>
       <td class="db-td"><span class="vital-inline ${hc}">HR ${p.vitals.hr}</span> <span class="vital-inline ${sc}">· SpO₂ ${p.vitals.spo2}%</span></td>
       <td class="db-td mono">${p.eta} min</td>
+      <td class="db-td muted">${p.bay||'—'}</td>
       <td class="db-td"><span class="ack-dot ${ackedMap[p.id]?'acked':'pending'}"></span>${ackedMap[p.id]?'Acknowledged':'Pending'}</td>
     </tr>`;
   }).join('');
@@ -656,6 +689,12 @@ function openPatient(id){
       <div class="prop-row">
         <div class="prop-key"><svg viewBox="0 0 13 13" fill="none"><circle cx="6.5" cy="6.5" r="5" stroke="currentColor" stroke-width="1.2"/><path d="M6.5 3.5v3l2 1" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>ETA</div>
         <div class="prop-val" style="color:var(--b-text);font-weight:500">${p.eta} minutes</div>
+      </div>
+      <div class="prop-row">
+        <div class="prop-key">🛏 Bay</div>
+        <div class="prop-val"><select onchange="assignBay('${p.id}',this.value)" style="padding:4px 8px;border-radius:4px;border:1px solid var(--n-border);font-size:12px;background:var(--n-bg)">
+          <option value="">— Unassigned</option>${[1,2,3,4,5,6,7,8].map(n=>`<option value="Bay ${n}" ${(p.bay||'')==='Bay '+n?'selected':''}>Bay ${n}</option>`).join('')}
+        </select></div>
       </div>
       <div class="prop-row">
         <div class="prop-key"><svg viewBox="0 0 13 13" fill="none"><circle cx="6.5" cy="6.5" r="1.5" fill="currentColor"/><path d="M6.5 2v2M6.5 9v2M2 6.5h2M9 6.5h2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>Conscious</div>
@@ -709,6 +748,15 @@ function toggleAck(id){
   openPatient(id);renderTable();updateMetrics();
 }
 
+async function assignBay(encId,bay){
+  const val=bay&&bay.trim()?bay.trim():null;
+  const res=await fetch(`/api/encounters/${encId}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({bay:val})});
+  if(!res.ok)return;
+  const p=patients.find(x=>x.id===encId);if(p)p.bay=val;
+  renderTable();updateBayGrid();
+  if(selId===encId)openPatient(encId);
+}
+
 function updateMetrics(){
   document.getElementById('m-al').textContent=patients.filter(p=>!ackedMap[p.id]).length;
   document.getElementById('m-cr').textContent=patients.filter(p=>p.severity==='critical').length;
@@ -734,10 +782,10 @@ sock.on('disconnect',()=>{
   el.querySelector('.live-dot').style.background='var(--gy-text)';
   el.lastChild.textContent=' Disconnected';
 });
-sock.on('initial:load',(inc)=>{inc.forEach(mergeEnc);renderTable();updateMetrics();updateAlertsList()});
-sock.on('encounters:init',(inc)=>{inc.forEach(mergeEnc);renderTable();updateMetrics();updateAlertsList()});
+sock.on('initial:load',(inc)=>{inc.forEach(mergeEnc);renderTable();updateMetrics();updateAlertsList();updateBayGrid()});
+sock.on('encounters:init',(inc)=>{inc.forEach(mergeEnc);renderTable();updateMetrics();updateAlertsList();updateBayGrid()});
 sock.on('patient:update',(enc)=>{
-  mergeEnc(enc);renderTable();updateMetrics();updateAlertsList();
+  mergeEnc(enc);renderTable();updateMetrics();updateAlertsList();updateBayGrid();
   if(selId===enc.encounterId)openPatient(enc.encounterId);
 });
 
@@ -745,13 +793,13 @@ function mergeEnc(enc){
   const v=enc.vitals||{};
   const sexRaw=enc.patient?.sex;
   const sex=sexRaw==='M'||sexRaw==='Male'?'M':sexRaw==='F'||sexRaw==='Female'?'F':'?';
-  const mapped={id:enc.encounterId,ambulance:enc.ambulanceId||'AMB-01',eta:enc.etaMinutes||8,age:enc.patient?.age||'?',sex,complaint:enc.patient?.chiefComplaint||'Incoming patient',severity:enc.severity||'moderate',category:enc.patient?.category||'General',conscious:enc.patient?.conscious!==false,breathing:enc.patient?.breathing||'normal',vitals:{hr:v.heartRate||'—',bp:`${v.bpSystolic||'—'}/${v.bpDiastolic||'—'}`,spo2:v.spo2||'—',rr:v.respiratoryRate||'—',temp:v.temperature||'—',gcs:v.gcs||'—'},notes:enc.patient?.notes||'',symptoms:enc.patient?.symptoms||[],acked:enc.acked||false,actions:(enc.recs||[]).map(r=>({type:'info',title:r,detail:''})),timeline:enc.timeline||[]};
+  const mapped={id:enc.encounterId,ambulance:enc.ambulanceId||'AMB-01',eta:enc.etaMinutes||8,age:enc.patient?.age||'?',sex,complaint:enc.patient?.chiefComplaint||'Incoming patient',severity:enc.severity||'moderate',category:enc.patient?.category||'General',conscious:enc.patient?.conscious!==false,breathing:enc.patient?.breathing||'normal',vitals:{hr:v.heartRate||'—',bp:`${v.bpSystolic||'—'}/${v.bpDiastolic||'—'}`,spo2:v.spo2||'—',rr:v.respiratoryRate||'—',temp:v.temperature||'—',gcs:v.gcs||'—'},notes:enc.patient?.notes||'',symptoms:enc.patient?.symptoms||[],acked:enc.acked||false,bay:enc.bay||null,actions:(enc.recs||[]).map(r=>({type:'info',title:r,detail:''})),timeline:enc.timeline||[]};
   const idx=patients.findIndex(p=>p.id===enc.encounterId);
   if(idx>=0)Object.assign(patients[idx],mapped);else{patients.unshift(mapped)}
   ackedMap[enc.encounterId]=mapped.acked;
 }
 
-setInterval(updateClock,1000);updateClock();renderTable();updateMetrics();updateAlertsList();
+setInterval(updateClock,1000);updateClock();renderTable();updateMetrics();updateAlertsList();updateBayGrid();
 </script>
 </body>
 </html>

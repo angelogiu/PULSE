@@ -75,6 +75,17 @@ app.post('/api/acknowledge/:id', (req, res) => {
   res.json({ ok: true });
 });
 
+// PATCH /api/encounters/:id — update encounter (e.g. assign bay)
+app.patch('/api/encounters/:id', (req, res) => {
+  const enc = encounters.get(req.params.id);
+  if (!enc) return res.status(404).json({ error: 'Not found' });
+  if (req.body.bay !== undefined) enc.bay = req.body.bay || null;
+  enc.updatedAt = new Date().toISOString();
+  io.emit('patient:update', enc);
+  console.log(`[BAY]     ${enc.encounterId} → ${enc.bay || 'unassigned'}`);
+  res.json({ ok: true, encounter: enc });
+});
+
 // GET /api/encounters — initial load for hospital dashboard
 app.get('/api/encounters', (req, res) => {
   res.json([...encounters.values()].filter(e => e.status === 'active'));
