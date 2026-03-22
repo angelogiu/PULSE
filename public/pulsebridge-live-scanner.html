@@ -193,6 +193,78 @@ body{background:var(--n-bg);color:var(--n-text);font-family:var(--font);font-siz
 .n-divider{height:1px;background:var(--n-border);margin:4px 0}
 ::-webkit-scrollbar{width:5px}
 ::-webkit-scrollbar-thumb{background:var(--n-hover2);border-radius:3px}
+
+/* PAGE SWITCHING */
+.page{display:none;flex-direction:column;flex:1;overflow:hidden;min-width:0}
+.page.active{display:flex}
+
+/* SHARED WRAPPERS */
+.intake-wrap,.hist-wrap,.txlog-wrap,.cfg-wrap,.link-wrap{flex:1;overflow-y:auto;padding:16px 60px 40px}
+
+/* INTAKE FORM */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.form-field{display:flex;flex-direction:column;gap:4px}
+.form-field.full{grid-column:span 2}
+.form-lbl{font-size:11px;color:var(--n-text3);font-weight:500}
+.form-field input,.form-field select,.form-field textarea{background:var(--n-input);border:1px solid transparent;border-radius:4px;color:var(--n-text);font-family:var(--font);font-size:13px;padding:7px 10px;outline:none;transition:all .1s}
+.form-field input:focus,.form-field select:focus,.form-field textarea:focus{border-color:var(--b-text);background:var(--n-bg);box-shadow:0 0 0 2px var(--b-bg)}
+.form-field select option{background:white}
+.form-field textarea{resize:vertical;min-height:56px}
+
+/* HISTORY TABLE */
+.hist-table{width:100%;border-collapse:collapse;font-size:13px}
+.hist-table th{text-align:left;padding:6px 10px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--n-text3);border-bottom:2px solid var(--n-border)}
+.hist-table td{padding:7px 10px;border-bottom:1px solid var(--n-border);font-variant-numeric:tabular-nums;color:var(--n-text2)}
+.hist-table tr:last-child td{border-bottom:none}
+.hist-table tr:hover td{background:var(--n-hover)}
+.sev-badge{display:inline-block;padding:2px 7px;border-radius:3px;font-size:11px;font-weight:600;text-transform:uppercase}
+.sev-badge.critical{background:var(--r-bg);color:var(--r-text)}
+.sev-badge.high{background:var(--o-bg);color:var(--o-text)}
+.sev-badge.moderate{background:var(--y-bg);color:var(--y-text)}
+.sev-badge.low{background:var(--g-bg);color:var(--g-text)}
+.sev-badge.unknown{background:var(--gy-bg);color:var(--gy-text)}
+.empty-state{color:var(--n-text3);font-size:13px;padding:60px 0;text-align:center;display:flex;flex-direction:column;align-items:center;gap:8px}
+.empty-state svg{opacity:.35}
+
+/* TX LOG */
+.txlog-entry{display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid var(--n-border)}
+.txlog-entry:last-child{border-bottom:none}
+.txlog-time{font-size:12px;color:var(--n-text3);min-width:60px;font-variant-numeric:tabular-nums;flex-shrink:0;padding-top:1px}
+.txlog-body{flex:1}
+.txlog-title{font-size:13px;font-weight:500;color:var(--n-text)}
+.txlog-sub{font-size:11px;color:var(--n-text3);margin-top:2px}
+.txlog-badge{font-size:11px;padding:2px 7px;border-radius:3px;flex-shrink:0;font-weight:500}
+.txlog-badge.sent{background:var(--b-bg);color:var(--b-text)}
+.txlog-badge.acked{background:var(--g-bg);color:var(--g-text)}
+
+/* CAMERA CONFIG */
+.cfg-section{margin-bottom:24px}
+.cfg-section-title{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--n-text3);margin-bottom:4px}
+.cfg-row{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--n-border)}
+.cfg-row:last-child{border-bottom:none}
+.cfg-row-info{flex:1}
+.cfg-row-label{font-size:13px;color:var(--n-text)}
+.cfg-row-sub{font-size:11px;color:var(--n-text3);margin-top:2px}
+.cfg-control{flex-shrink:0;display:flex;align-items:center;gap:6px}
+.toggle{position:relative;width:34px;height:18px;cursor:pointer;display:inline-block}
+.toggle input{opacity:0;width:0;height:0;position:absolute}
+.toggle-track{position:absolute;inset:0;border-radius:9px;background:var(--n-hover2);transition:background .2s}
+.toggle input:checked+.toggle-track{background:#2563eb}
+.toggle-thumb{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:white;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.toggle input:checked~.toggle-thumb{transform:translateX(16px)}
+
+/* HOSPITAL LINK */
+.link-card{border-radius:6px;border:1px solid var(--n-border);overflow:hidden;margin-bottom:16px}
+.link-card-head{padding:10px 14px;background:var(--n-sidebar);border-bottom:1px solid var(--n-border);font-size:12px;font-weight:600;color:var(--n-text2)}
+.link-card-body{padding:12px 14px;display:flex;flex-direction:column;gap:6px}
+.link-prop{display:flex;align-items:center;justify-content:space-between;padding:3px 0}
+.link-prop-key{color:var(--n-text3);font-size:12px}
+.link-prop-val{font-weight:500;color:var(--n-text);font-size:13px;font-variant-numeric:tabular-nums}
+.link-prop-mono{font-family:monospace;font-size:12px;color:var(--n-text2);max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.conn-indicator{display:flex;align-items:center;gap:5px}
+.conn-dot{width:7px;height:7px;border-radius:50%;background:var(--n-hover2);flex-shrink:0}
+.conn-dot.connected{background:#2d9e2d}
+.conn-dot.disconnected{background:#e03e3e}
 </style>
 </head>
 <body>
@@ -209,16 +281,16 @@ body{background:var(--n-bg);color:var(--n-text);font-family:var(--font);font-siz
     <div class="sb-act"><svg viewBox="0 0 14 14" fill="none"><rect x="1" y="1" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.3"/><path d="M7 4.5v5M4.5 7h5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>New page</div>
   </div>
   <div class="sb-section">
-    <div class="sb-item active"><span class="si-icon">📷</span>Live Scan</div>
-    <div class="sb-item"><span class="si-icon">📋</span>New Intake</div>
-    <div class="sb-item"><span class="si-icon">📊</span>Vitals History</div>
-    <div class="sb-item"><span class="si-icon">🚑</span>Transmission Log</div>
+    <div class="sb-item active" id="nav-live" onclick="navTo('nav-live')"><span class="si-icon">📷</span>Live Scan</div>
+    <div class="sb-item" id="nav-intake" onclick="navTo('nav-intake')"><span class="si-icon">📋</span>New Intake</div>
+    <div class="sb-item" id="nav-history" onclick="navTo('nav-history')"><span class="si-icon">📊</span>Vitals History</div>
+    <div class="sb-item" id="nav-txlog" onclick="navTo('nav-txlog')"><span class="si-icon">🚑</span>Transmission Log</div>
   </div>
   <div class="sb-divider"></div>
   <div class="sb-section">
     <div class="sb-section-lbl">Settings</div>
-    <div class="sb-item"><span class="si-icon">⚙️</span>Camera Config</div>
-    <div class="sb-item"><span class="si-icon">🔗</span>Hospital Link</div>
+    <div class="sb-item" id="nav-camcfg" onclick="navTo('nav-camcfg')"><span class="si-icon">⚙️</span>Camera Config</div>
+    <div class="sb-item" id="nav-hoslink" onclick="navTo('nav-hoslink')"><span class="si-icon">🔗</span>Hospital Link</div>
   </div>
   <div class="sb-bottom">
     <div class="sb-user">
@@ -232,7 +304,7 @@ body{background:var(--n-bg);color:var(--n-text);font-family:var(--font);font-siz
 <div class="main">
   <div class="topbar">
     <div class="breadcrumb">
-      <span>Pulse</span><span class="bc-sep">/</span><span class="bc-current">Live Scan</span>
+      <span>Pulse</span><span class="bc-sep">/</span><span class="bc-current" id="bc-page">Live Scan</span>
     </div>
     <div class="topbar-right">
       <span class="scan-cnt-txt" id="scan-cnt">0 scans</span>
@@ -241,6 +313,8 @@ body{background:var(--n-bg);color:var(--n-text);font-family:var(--font);font-siz
     </div>
   </div>
 
+  <!-- PAGE: LIVE SCAN -->
+  <div id="page-live-scan" class="page active">
   <div class="page-header">
     <div class="page-icon">📷</div>
     <div class="page-title">Live Monitor Scan</div>
@@ -406,19 +480,250 @@ body{background:var(--n-bg);color:var(--n-text);font-family:var(--font);font-siz
       </div>
     </div>
   </div>
-</div>
+  </div><!-- /page-live-scan -->
+
+  <!-- PAGE: NEW INTAKE -->
+  <div id="page-intake" class="page">
+    <div class="page-header">
+      <div class="page-icon">📋</div>
+      <div class="page-title">New Patient Intake</div>
+      <div class="page-desc">Manually enter patient demographics and vitals to transmit to the ER</div>
+    </div>
+    <div class="intake-wrap">
+      <div class="n-section">
+        <div class="n-section-title">
+          <svg viewBox="0 0 13 13" fill="none"><circle cx="6.5" cy="4.5" r="2.5" stroke="currentColor" stroke-width="1.2"/><path d="M1.5 11c0-2.5 2.2-4 5-4s5 1.5 5 4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+          Patient Information
+        </div>
+        <div class="form-grid">
+          <div class="form-field full"><div class="form-lbl">Chief Complaint</div><input type="text" id="in-complaint" placeholder="e.g. Chest pain, shortness of breath…"></div>
+          <div class="form-field"><div class="form-lbl">Estimated Age</div><input type="number" id="in-age" placeholder="years" min="0" max="120"></div>
+          <div class="form-field"><div class="form-lbl">Sex</div>
+            <select id="in-sex">
+              <option value="">Unknown</option>
+              <option value="M">Male</option>
+              <option value="F">Female</option>
+              <option value="O">Other</option>
+            </select>
+          </div>
+          <div class="form-field full"><div class="form-lbl">Notes / History</div><textarea id="in-notes" placeholder="Medications, past history, mechanism of injury…"></textarea></div>
+        </div>
+      </div>
+      <div class="n-section">
+        <div class="n-section-title">
+          <svg viewBox="0 0 13 13" fill="none"><path d="M6.5 1v11M1 6.5h11" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+          Vitals
+        </div>
+        <div class="form-grid">
+          <div class="form-field"><div class="form-lbl">Heart Rate (bpm)</div><input type="number" id="in-hr" placeholder="60–100" min="0" max="300"></div>
+          <div class="form-field"><div class="form-lbl">SpO₂ (%)</div><input type="number" id="in-spo2" placeholder="95–100" min="0" max="100"></div>
+          <div class="form-field"><div class="form-lbl">BP Systolic (mmHg)</div><input type="number" id="in-sbp" placeholder="120" min="0" max="300"></div>
+          <div class="form-field"><div class="form-lbl">BP Diastolic (mmHg)</div><input type="number" id="in-dbp" placeholder="80" min="0" max="200"></div>
+          <div class="form-field"><div class="form-lbl">Resp Rate (/min)</div><input type="number" id="in-rr" placeholder="12–20" min="0" max="60"></div>
+          <div class="form-field"><div class="form-lbl">Temperature (°C)</div><input type="number" id="in-temp" placeholder="37.0" step="0.1" min="30" max="45"></div>
+          <div class="form-field"><div class="form-lbl">GCS (/15)</div><input type="number" id="in-gcs" placeholder="15" min="3" max="15"></div>
+          <div class="form-field"><div class="form-lbl">ETA (minutes)</div><input type="number" id="in-eta" placeholder="8" min="1" max="120"></div>
+        </div>
+      </div>
+      <div class="btn-row" style="margin-top:4px">
+        <button class="n-btn green" onclick="submitIntake()">▶ Submit to Hospital</button>
+        <button class="n-btn" onclick="clearIntake()">✕ Clear</button>
+      </div>
+      <div id="intake-feedback" style="display:none;margin-top:12px;padding:8px 12px;border-radius:4px;font-size:12px;font-weight:500"></div>
+    </div>
+  </div><!-- /page-intake -->
+
+  <!-- PAGE: VITALS HISTORY -->
+  <div id="page-history" class="page">
+    <div class="page-header">
+      <div class="page-icon">📊</div>
+      <div class="page-title">Vitals History</div>
+      <div class="page-desc">All scan results captured this session</div>
+    </div>
+    <div class="hist-wrap">
+      <div id="hist-empty" class="empty-state">
+        <svg width="36" height="36" viewBox="0 0 36 36" fill="none"><rect x="3" y="3" width="30" height="30" rx="5" stroke="currentColor" stroke-width="1.5"/><path d="M10 24l5-6 4 4 4-8 4 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        No scans yet — start the camera and point it at a monitor
+      </div>
+      <table class="hist-table" id="hist-table" style="display:none">
+        <thead>
+          <tr>
+            <th>Time</th><th>HR</th><th>BP</th><th>SpO₂</th><th>RR</th><th>Temp</th><th>GCS</th><th>Severity</th>
+          </tr>
+        </thead>
+        <tbody id="hist-tbody"></tbody>
+      </table>
+    </div>
+  </div><!-- /page-history -->
+
+  <!-- PAGE: TRANSMISSION LOG -->
+  <div id="page-txlog" class="page">
+    <div class="page-header">
+      <div class="page-icon">🚑</div>
+      <div class="page-title">Transmission Log</div>
+      <div class="page-desc">All data sent to the hospital this session</div>
+    </div>
+    <div class="txlog-wrap">
+      <div id="txlog-empty" class="empty-state">
+        <svg width="36" height="36" viewBox="0 0 36 36" fill="none"><path d="M18 4L32 28H4L18 4Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M18 14v7M18 25v2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        No transmissions yet — scan a monitor or submit a manual intake
+      </div>
+      <div id="txlog-list"></div>
+    </div>
+  </div><!-- /page-txlog -->
+
+  <!-- PAGE: CAMERA CONFIG -->
+  <div id="page-camcfg" class="page">
+    <div class="page-header">
+      <div class="page-icon">⚙️</div>
+      <div class="page-title">Camera Config</div>
+      <div class="page-desc">Adjust scan behaviour, camera, and image settings</div>
+    </div>
+    <div class="cfg-wrap">
+      <div class="cfg-section">
+        <div class="cfg-section-title">Scan Settings</div>
+        <div class="cfg-row">
+          <div class="cfg-row-info">
+            <div class="cfg-row-label">Auto-scan interval</div>
+            <div class="cfg-row-sub">How often to capture and analyse a frame</div>
+          </div>
+          <div class="cfg-control">
+            <input type="range" id="cfg-ivl" min="3" max="30" step="1" value="8" oninput="setCfgIvl(this.value)" style="accent-color:#2563eb;width:110px">
+            <span id="cfg-ivl-val" style="font-size:12px;color:var(--n-text2);min-width:28px;font-variant-numeric:tabular-nums">8s</span>
+          </div>
+        </div>
+        <div class="cfg-row">
+          <div class="cfg-row-info">
+            <div class="cfg-row-label">Camera facing</div>
+            <div class="cfg-row-sub">Use back camera for monitor scanning; front for testing</div>
+          </div>
+          <div class="cfg-control">
+            <select id="cfg-facing" onchange="setCfgFacing(this.value)" style="background:var(--n-input);border:1px solid var(--n-border);border-radius:4px;color:var(--n-text);font-family:var(--font);font-size:12px;padding:5px 8px;outline:none">
+              <option value="environment">Back (Environment)</option>
+              <option value="user">Front (Selfie)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="cfg-section">
+        <div class="cfg-section-title">Image Quality</div>
+        <div class="cfg-row">
+          <div class="cfg-row-info">
+            <div class="cfg-row-label">JPEG compression</div>
+            <div class="cfg-row-sub">Higher quality improves OCR accuracy but uses more data</div>
+          </div>
+          <div class="cfg-control">
+            <input type="range" id="cfg-qual" min="0.5" max="1.0" step="0.05" value="0.85" oninput="setCfgQual(this.value)" style="accent-color:#2563eb;width:110px">
+            <span id="cfg-qual-val" style="font-size:12px;color:var(--n-text2);min-width:34px;font-variant-numeric:tabular-nums">85%</span>
+          </div>
+        </div>
+      </div>
+      <div class="cfg-section">
+        <div class="cfg-section-title">Overlays</div>
+        <div class="cfg-row">
+          <div class="cfg-row-info">
+            <div class="cfg-row-label">Detection bounding boxes</div>
+            <div class="cfg-row-sub">Show boxes around detected vitals regions after each scan</div>
+          </div>
+          <div class="cfg-control">
+            <label class="toggle">
+              <input type="checkbox" id="cfg-detboxes" checked onchange="showDetBoxes=this.checked">
+              <div class="toggle-track"></div>
+              <div class="toggle-thumb"></div>
+            </label>
+          </div>
+        </div>
+        <div class="cfg-row">
+          <div class="cfg-row-info">
+            <div class="cfg-row-label">Scan line animation</div>
+            <div class="cfg-row-sub">Visual sweep animation while a frame is being processed</div>
+          </div>
+          <div class="cfg-control">
+            <label class="toggle">
+              <input type="checkbox" id="cfg-scanline" checked onchange="showScanLine=this.checked">
+              <div class="toggle-track"></div>
+              <div class="toggle-thumb"></div>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div><!-- /page-camcfg -->
+
+  <!-- PAGE: HOSPITAL LINK -->
+  <div id="page-hoslink" class="page">
+    <div class="page-header">
+      <div class="page-icon">🔗</div>
+      <div class="page-title">Hospital Link</div>
+      <div class="page-desc">Real-time connection to the ER dashboard</div>
+    </div>
+    <div class="link-wrap">
+      <div class="link-card">
+        <div class="link-card-head">Connection Status</div>
+        <div class="link-card-body">
+          <div class="link-prop">
+            <span class="link-prop-key">Status</span>
+            <span class="link-prop-val"><span class="conn-indicator"><span class="conn-dot" id="ls-dot"></span><span id="ls-status-txt">Checking…</span></span></span>
+          </div>
+          <div class="link-prop">
+            <span class="link-prop-key">Server</span>
+            <span class="link-prop-val link-prop-mono" id="ls-server">—</span>
+          </div>
+          <div class="link-prop">
+            <span class="link-prop-key">Socket ID</span>
+            <span class="link-prop-val link-prop-mono" id="ls-sockid">—</span>
+          </div>
+          <div class="link-prop">
+            <span class="link-prop-key">Encounter ID</span>
+            <span class="link-prop-val link-prop-mono" id="ls-encid">—</span>
+          </div>
+          <div class="link-prop">
+            <span class="link-prop-key">Last sync</span>
+            <span class="link-prop-val" id="ls-lastsync">Never</span>
+          </div>
+        </div>
+      </div>
+      <div class="btn-row" style="margin-bottom:20px">
+        <button class="n-btn blue" onclick="reconnectSrv()">↺ Reconnect</button>
+        <button class="n-btn" onclick="copyEncounterId()">⎘ Copy Encounter ID</button>
+      </div>
+      <div class="n-section">
+        <div class="n-section-title">
+          <svg viewBox="0 0 13 13" fill="none"><rect x="1" y="3" width="11" height="8" rx="1.5" stroke="currentColor" stroke-width="1.2"/><path d="M4 3V2.5a2.5 2.5 0 015 0V3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+          Ambulance Info
+        </div>
+        <div class="form-grid">
+          <div class="form-field"><div class="form-lbl">Ambulance ID</div><input type="text" id="ls-ambid" value="AMB-04" placeholder="AMB-XX" oninput="updateAmbId(this.value)"></div>
+          <div class="form-field"><div class="form-lbl">Paramedic Name</div><input type="text" id="ls-paraname" placeholder="Optional" oninput="updateParaName(this.value)"></div>
+        </div>
+      </div>
+    </div>
+  </div><!-- /page-hoslink -->
+
+</div><!-- /main -->
 
 <script>
 let stream=null,scanTimer=null,ivlSecs=8,scanCount=0,facingMode='environment',hasData=false;
 let encId='ENC-'+Date.now().toString(36).toUpperCase();
 const hist={hr:[],spo2:[],bp:[]};
+const scanHistory=[];
+const txLog=[];
+let lastSeverity='unknown';
+let showDetBoxes=true,showScanLine=true,jpegQuality=0.85;
+let ambulanceId='AMB-04',paramedicName='';
 
 const SERVER='https://pulse-production-3ea1.up.railway.app';
 const sock=io(SERVER,{query:{role:'scanner'}});
 sock.on('connect',()=>log('Connected to Pulse server','ok'));
 sock.on('disconnect',()=>log('Server disconnected','warn'));
 sock.on('connect_error',()=>log('Server offline','err'));
-sock.on('patient:acked',({encounterId:id})=>{if(id===encId)log('Hospital acknowledged ✓','ok')});
+sock.on('patient:acked',({encounterId:id})=>{
+  if(id===encId){
+    log('Hospital acknowledged ✓','ok');
+    txLog.forEach(e=>{e.acked=true});
+    document.getElementById('ls-lastsync').textContent='Acked at '+nowStr();
+  }
+});
 
 // GPS TRACKING
 let gpsWatcher=null
@@ -491,7 +796,7 @@ async function captureNow(){
   const canvas=document.getElementById('canvas');
   canvas.width=video.videoWidth||640;canvas.height=video.videoHeight||480;
   canvas.getContext('2d').drawImage(video,0,0,canvas.width,canvas.height);
-  const dataUrl=canvas.toDataURL('image/jpeg',.85);
+  const dataUrl=canvas.toDataURL('image/jpeg',jpegQuality);
   const b64=dataUrl.split(',')[1];
   document.getElementById('last-frame-sec').style.display='block';
   document.getElementById('thumb-img').src=dataUrl;
@@ -502,7 +807,7 @@ async function captureNow(){
   await callVision(b64);
 }
 
-function triggerLine(){const el=document.getElementById('scan-line');if(!el)return;el.classList.remove('active');void el.offsetWidth;el.classList.add('active');setTimeout(()=>el.classList.remove('active'),2100)}
+function triggerLine(){if(!showScanLine)return;const el=document.getElementById('scan-line');if(!el)return;el.classList.remove('active');void el.offsetWidth;el.classList.add('active');setTimeout(()=>el.classList.remove('active'),2100)}
 
 async function callVision(b64){
   try{
@@ -546,6 +851,7 @@ function handleResult(r){
   if(r.bpSystolic){hist.bp.push(r.bpSystolic);if(hist.bp.length>10)hist.bp.shift()}
   renderSparks();
   const score=scoreRisk(r);renderSev(score);
+  scanHistory.push({time:nowStr(),heartRate:r.heartRate,bpSystolic:r.bpSystolic,bpDiastolic:r.bpDiastolic,spo2:r.spo2,respiratoryRate:r.respiratoryRate,temperature:r.temperature,gcs:r.gcs,severity:score.level});
   hasData=true;document.getElementById('btn-tx').disabled=false;
   postServer(r,score);renderDets(r);
 }
@@ -583,6 +889,7 @@ function scoreRisk(v){
 }
 
 function renderSev({level,recs}){
+  lastSeverity=level;
   document.getElementById('sev-card').className='sev-card '+level;
   document.getElementById('sev-val').className='sev-val '+level;
   document.getElementById('sev-val').textContent=level.toUpperCase();
@@ -591,6 +898,7 @@ function renderSev({level,recs}){
 
 function renderDets(r){
   const ov=document.getElementById('det-ov');if(!ov)return;
+  if(!showDetBoxes){ov.innerHTML='';return;}
   const regions=[];
   if(r.heartRate)regions.push({label:'HR: '+r.heartRate,top:'12%',left:'5%',w:'22%',h:'18%'});
   if(r.spo2)regions.push({label:'SpO₂: '+r.spo2+'%',top:'12%',left:'72%',w:'22%',h:'18%'});
@@ -604,17 +912,21 @@ function postServer(vitals,score){
   const age=vitals.estimatedAge||parseInt(ageEl.replace('~','').replace(' years',''))||null;
   const sex=vitals.estimatedSex||null;
   fetch(SERVER+'/intake',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
-    encounterId:encId,ambulanceId:'AMB-04',
+    encounterId:encId,ambulanceId,
     vitals:{heartRate:vitals.heartRate,bpSystolic:vitals.bpSystolic,bpDiastolic:vitals.bpDiastolic,spo2:vitals.spo2,respiratoryRate:vitals.respiratoryRate,temperature:vitals.temperature,gcs:vitals.gcs},
     severity:score.level,recs:score.recs,
     etaMinutes:parseInt(document.getElementById('pi-eta').textContent)||8,
     patient:{chiefComplaint:document.getElementById('f-complaint').value||'Incoming patient',notes:document.getElementById('f-notes').value,age,sex:sex?sex.charAt(0).toUpperCase():'?'}
-  })}).catch(()=>{});
+  })}).then(()=>{
+    addTxEntry('Auto-scan · '+encId, score.level, 'Auto-scan');
+    document.getElementById('ls-lastsync').textContent=nowStr();
+  }).catch(()=>{});
 }
 
 function transmit(){
   document.getElementById('toast').style.display='block';
   log('Encounter transmitted — '+encId,'ok');
+  addTxEntry('Manual transmit · '+encId, lastSeverity, 'Manual');
   setTimeout(()=>{document.getElementById('toast').style.display='none'},3000);
 }
 
@@ -634,6 +946,143 @@ function log(msg,cls){
 }
 function updateClock(){const n=new Date();document.getElementById('clock').textContent=`${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}:${String(n.getSeconds()).padStart(2,'0')}`}
 setInterval(updateClock,1000);updateClock();
+
+// ── PAGE NAVIGATION ──────────────────────────────────────────────────────────
+const PAGE_MAP={
+  'nav-live':'page-live-scan','nav-intake':'page-intake',
+  'nav-history':'page-history','nav-txlog':'page-txlog',
+  'nav-camcfg':'page-camcfg','nav-hoslink':'page-hoslink'
+};
+const PAGE_TITLES={
+  'nav-live':'Live Scan','nav-intake':'New Intake',
+  'nav-history':'Vitals History','nav-txlog':'Transmission Log',
+  'nav-camcfg':'Camera Config','nav-hoslink':'Hospital Link'
+};
+function navTo(id){
+  document.querySelectorAll('.sb-item').forEach(el=>el.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.querySelectorAll('.page').forEach(el=>el.classList.remove('active'));
+  document.getElementById(PAGE_MAP[id]).classList.add('active');
+  document.getElementById('bc-page').textContent=PAGE_TITLES[id];
+  if(id==='nav-history')renderHistTable();
+  if(id==='nav-txlog')renderTxLog();
+  if(id==='nav-hoslink')refreshHostLink();
+  if(id==='nav-camcfg'){
+    document.getElementById('cfg-ivl').value=ivlSecs;
+    document.getElementById('cfg-ivl-val').textContent=ivlSecs+'s';
+    document.getElementById('cfg-facing').value=facingMode;
+  }
+}
+
+// ── NEW INTAKE ────────────────────────────────────────────────────────────────
+function submitIntake(){
+  const complaint=document.getElementById('in-complaint').value.trim();
+  const age=parseInt(document.getElementById('in-age').value)||null;
+  const sex=document.getElementById('in-sex').value||null;
+  const notes=document.getElementById('in-notes').value.trim();
+  const hr=parseFloat(document.getElementById('in-hr').value)||null;
+  const sbp=parseFloat(document.getElementById('in-sbp').value)||null;
+  const dbp=parseFloat(document.getElementById('in-dbp').value)||null;
+  const spo2=parseFloat(document.getElementById('in-spo2').value)||null;
+  const rr=parseFloat(document.getElementById('in-rr').value)||null;
+  const temp=parseFloat(document.getElementById('in-temp').value)||null;
+  const gcs=parseFloat(document.getElementById('in-gcs').value)||null;
+  const eta=parseInt(document.getElementById('in-eta').value)||8;
+  const vitals={heartRate:hr,bpSystolic:sbp,bpDiastolic:dbp,spo2,respiratoryRate:rr,temperature:temp,gcs};
+  const score=scoreRisk(vitals);
+  const intakeId='INT-'+Date.now().toString(36).toUpperCase();
+  const fb=document.getElementById('intake-feedback');
+  fetch(SERVER+'/intake',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+    encounterId:intakeId,ambulanceId,
+    vitals,severity:score.level,recs:score.recs,etaMinutes:eta,
+    patient:{chiefComplaint:complaint||'Manual intake',notes,age,sex:sex||'?'}
+  })}).then(()=>{
+    addTxEntry('Manual intake · '+(complaint||'No complaint'), score.level, 'Manual intake');
+    fb.style.cssText='display:block;padding:8px 12px;border-radius:4px;font-size:12px;font-weight:500;background:var(--g-bg);color:var(--g-text);border:1px solid var(--g-text)';
+    fb.textContent='✓ Submitted — Severity: '+score.level.toUpperCase()+' · '+intakeId;
+    setTimeout(()=>{fb.style.display='none'},5000);
+    log('Manual intake submitted — '+intakeId,'ok');
+  }).catch(()=>{
+    fb.style.cssText='display:block;padding:8px 12px;border-radius:4px;font-size:12px;font-weight:500;background:var(--r-bg);color:var(--r-text);border:1px solid var(--r-text)';
+    fb.textContent='✗ Failed to transmit — server may be offline';
+    setTimeout(()=>{fb.style.display='none'},4000);
+  });
+}
+function clearIntake(){
+  ['in-complaint','in-notes','in-hr','in-sbp','in-dbp','in-spo2','in-rr','in-temp','in-gcs','in-eta','in-age'].forEach(id=>{
+    const el=document.getElementById(id);if(el)el.value='';
+  });
+  document.getElementById('in-sex').value='';
+  document.getElementById('intake-feedback').style.display='none';
+}
+
+// ── VITALS HISTORY ────────────────────────────────────────────────────────────
+function renderHistTable(){
+  const tbody=document.getElementById('hist-tbody');
+  const empty=document.getElementById('hist-empty');
+  const table=document.getElementById('hist-table');
+  if(!scanHistory.length){empty.style.display='flex';table.style.display='none';return}
+  empty.style.display='none';table.style.display='table';
+  tbody.innerHTML=scanHistory.slice().reverse().map(s=>`
+    <tr>
+      <td>${s.time}</td>
+      <td>${s.heartRate??'—'}</td>
+      <td>${s.bpSystolic&&s.bpDiastolic?s.bpSystolic+'/'+s.bpDiastolic:(s.bpSystolic??'—')}</td>
+      <td>${s.spo2??'—'}</td>
+      <td>${s.respiratoryRate??'—'}</td>
+      <td>${s.temperature??'—'}</td>
+      <td>${s.gcs??'—'}</td>
+      <td><span class="sev-badge ${s.severity||'unknown'}">${s.severity||'—'}</span></td>
+    </tr>`).join('');
+}
+
+// ── TRANSMISSION LOG ──────────────────────────────────────────────────────────
+function addTxEntry(title,severity,type){
+  txLog.unshift({time:nowStr(),title,severity:severity||'unknown',type,acked:false});
+  if(txLog.length>100)txLog.pop();
+}
+function renderTxLog(){
+  const list=document.getElementById('txlog-list');
+  const empty=document.getElementById('txlog-empty');
+  if(!txLog.length){empty.style.display='flex';list.innerHTML='';return}
+  empty.style.display='none';
+  list.innerHTML=txLog.map(e=>`
+    <div class="txlog-entry">
+      <div class="txlog-time">${e.time}</div>
+      <div class="txlog-body">
+        <div class="txlog-title">${e.title}</div>
+        <div class="txlog-sub">Severity: <span class="sev-badge ${e.severity}" style="font-size:10px;padding:1px 5px">${e.severity}</span> · ${e.type}</div>
+      </div>
+      <div class="txlog-badge ${e.acked?'acked':'sent'}">${e.acked?'✓ Acked':'Sent'}</div>
+    </div>`).join('');
+}
+
+// ── CAMERA CONFIG ─────────────────────────────────────────────────────────────
+function setCfgIvl(v){
+  ivlSecs=parseInt(v);
+  document.getElementById('ivl-val').textContent=v+'s';
+  document.getElementById('cfg-ivl-val').textContent=v+'s';
+  document.getElementById('ivl').value=v;
+  if(stream)scheduleNext();
+}
+function setCfgFacing(v){facingMode=v;if(stream){stopCam();startCam()}}
+function setCfgQual(v){jpegQuality=parseFloat(v);document.getElementById('cfg-qual-val').textContent=Math.round(v*100)+'%'}
+
+// ── HOSPITAL LINK ─────────────────────────────────────────────────────────────
+function refreshHostLink(){
+  document.getElementById('ls-server').textContent=SERVER;
+  document.getElementById('ls-encid').textContent=encId;
+  const ok=sock.connected;
+  document.getElementById('ls-dot').className='conn-dot '+(ok?'connected':'disconnected');
+  document.getElementById('ls-status-txt').textContent=ok?'Connected':'Disconnected';
+  document.getElementById('ls-sockid').textContent=sock.id||'—';
+}
+function reconnectSrv(){sock.disconnect();setTimeout(()=>sock.connect(),400);log('Reconnecting to server…','info')}
+function copyEncounterId(){
+  navigator.clipboard.writeText(encId).then(()=>log('Encounter ID copied','ok')).catch(()=>{});
+}
+function updateAmbId(v){ambulanceId=v||'AMB-04'}
+function updateParaName(v){paramedicName=v}
 </script>
 </body>
 </html>
