@@ -184,6 +184,30 @@ body{background:var(--n-bg);color:var(--n-text);font-family:var(--font);font-siz
 .ack-btn-notion:hover{background:var(--n-hover2)}
 .ack-btn-notion.acked{background:var(--g-bg);color:var(--g-text)}
 
+/* PAGE CONTENT (non-ER pages) */
+.page-content{display:none;flex:1;flex-direction:column;overflow-y:auto;padding:24px 60px 40px}
+.page-content.active{display:flex}
+.page-content h2{font-size:18px;margin-bottom:12px;color:var(--n-text)}
+.page-content p{color:var(--n-text2);font-size:13px;line-height:1.6;margin-bottom:16px}
+.page-card{background:var(--n-sidebar);border:1px solid var(--n-border);border-radius:8px;padding:20px;margin-bottom:16px}
+.page-card h3{font-size:14px;margin-bottom:8px}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);display:none;align-items:center;justify-content:center;z-index:100}
+.modal-overlay.active{display:flex}
+.modal{background:var(--n-bg);border-radius:8px;width:420px;max-width:95vw;max-height:90vh;overflow-y:auto}
+.modal-header{padding:16px 20px;border-bottom:1px solid var(--n-border);font-weight:600;font-size:16px}
+.modal-body{padding:20px}
+.modal-row{margin-bottom:14px}
+.modal-row label{display:block;font-size:12px;color:var(--n-text3);margin-bottom:4px}
+.modal-row input,.modal-row select{width:100%;padding:8px 12px;border:1px solid var(--n-border);border-radius:4px;font-family:var(--font);font-size:13px}
+.modal-footer{display:flex;gap:8px;justify-content:flex-end;padding:12px 20px;border-top:1px solid var(--n-border)}
+.modal-btn{padding:8px 16px;border-radius:4px;font-size:13px;cursor:pointer;border:none;font-family:var(--font)}
+.modal-btn.primary{background:var(--n-text);color:white}
+.modal-btn.primary:hover{background:#555}
+.modal-btn.ghost{background:transparent;color:var(--n-text2)}
+.modal-btn.ghost:hover{background:var(--n-hover)}
+
 /* METRICS */
 .metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border-bottom:1px solid var(--n-border);flex-shrink:0}
 .met{padding:10px 60px;border-right:1px solid var(--n-border)}
@@ -220,19 +244,19 @@ body{background:var(--n-bg);color:var(--n-text);font-family:var(--font);font-siz
   </div>
 
   <div class="sb-section">
-    <div class="sb-item active">
+    <div class="sb-item active" data-page="er" onclick="goPage('er',this)">
       <span class="si-icon">🏥</span>ER Dashboard<span class="sb-badge" id="sb-crit">2</span>
     </div>
-    <div class="sb-item">
+    <div class="sb-item" data-page="paramedic" onclick="goPage('paramedic',this)">
       <span class="si-icon">🚑</span>Paramedic Feed
     </div>
-    <div class="sb-item">
+    <div class="sb-item" data-page="alerts" onclick="goPage('alerts',this)">
       <span class="si-icon">⚡</span>Live Alerts<span class="sb-badge amber" id="sb-al">3</span>
     </div>
-    <div class="sb-item">
+    <div class="sb-item" data-page="pipeline" onclick="goPage('pipeline',this)">
       <span class="si-icon">📊</span>Agent Pipeline
     </div>
-    <div class="sb-item">
+    <div class="sb-item" data-page="records" onclick="goPage('records',this)">
       <span class="si-icon">📋</span>Patient Records
     </div>
   </div>
@@ -241,14 +265,14 @@ body{background:var(--n-bg);color:var(--n-text);font-family:var(--font);font-siz
 
   <div class="sb-section">
     <div class="sb-section-lbl">Hospital</div>
-    <div class="sb-item">
+    <div class="sb-item" data-page="files" onclick="goPage('files',this)">
       <span class="si-icon">🗂</span>Records
     </div>
-    <div class="sb-item">
+    <div class="sb-item" data-page="meds" onclick="goPage('meds',this)">
       <span class="si-icon">💊</span>Medications
     </div>
-    <div class="sb-item">
-      <span class="si-icon">🛏</span>Bay Status<span class="sb-badge gray">4/8</span>
+    <div class="sb-item" data-page="bays" onclick="goPage('bays',this)">
+      <span class="si-icon">🛏</span>Bay Status<span class="sb-badge gray" id="sb-bays">4/8</span>
     </div>
   </div>
 
@@ -287,12 +311,14 @@ body{background:var(--n-bg);color:var(--n-text);font-family:var(--font);font-siz
   </div>
 
   <!-- PAGE HEADER -->
-  <div class="page-header">
-    <div class="page-icon">🏥</div>
-    <div class="page-title">Incoming Patients</div>
-    <div class="page-desc">Real-time ambulance transport tracking — Vancouver General Hospital, ED Unit A</div>
+  <div class="page-header" id="page-header">
+    <div class="page-icon" id="page-icon">🏥</div>
+    <div class="page-title" id="page-title">Incoming Patients</div>
+    <div class="page-desc" id="page-desc">Real-time ambulance transport tracking — Vancouver General Hospital, ED Unit A</div>
   </div>
 
+  <!-- ER DASHBOARD PAGE -->
+  <div id="page-er">
   <!-- METRICS -->
   <div class="metrics">
     <div class="met"><div class="met-lbl">Incoming</div><div class="met-val blue" id="m-in">5</div><div class="met-sub">active transports</div></div>
@@ -336,7 +362,7 @@ body{background:var(--n-bg);color:var(--n-text);font-family:var(--font);font-siz
         </thead>
         <tbody id="db-body"></tbody>
       </table>
-      <div class="db-new-row">
+      <div class="db-new-row" onclick="openAddModal()">
         <svg viewBox="0 0 14 14" fill="none"><path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
         New patient
       </div>
@@ -350,9 +376,195 @@ body{background:var(--n-bg);color:var(--n-text);font-family:var(--font);font-siz
       </div>
     </div>
   </div>
+  </div>
+  <!-- END ER PAGE -->
+
+  <!-- OTHER PAGES -->
+  <div class="page-content" id="page-paramedic">
+    <h2>🚑 Paramedic Feed</h2>
+    <p>Live stream of incoming paramedic reports and radio traffic.</p>
+    <div class="page-card">
+      <h3>Active Feeds</h3>
+      <p>No active paramedic feeds. Connect a scanner or enable field unit sync.</p>
+    </div>
+    <div class="page-card">
+      <h3>Recent Transmissions</h3>
+      <p style="color:var(--n-text3);font-size:12px">ENC-2847 — STEMI inbound, 3 min ETA (09:42)</p>
+      <p style="color:var(--n-text3);font-size:12px">ENC-2846 — MVA head trauma, 6 min ETA (09:38)</p>
+    </div>
+  </div>
+  <div class="page-content" id="page-alerts">
+    <h2>⚡ Live Alerts</h2>
+    <p>Critical alerts requiring immediate attention.</p>
+    <div class="page-card">
+      <h3>Unacknowledged (<span id="alerts-count">0</span>)</h3>
+      <div id="alerts-list"><p style="color:var(--n-text3)">No pending alerts.</p></div>
+    </div>
+  </div>
+  <div class="page-content" id="page-pipeline">
+    <h2>📊 Agent Pipeline</h2>
+    <p>AI agent workflow and processing status.</p>
+    <div class="page-card">
+      <h3>Pipeline Status</h3>
+      <p>Vision OCR: <span style="color:var(--g-text)">● Active</span></p>
+      <p>Risk scoring: <span style="color:var(--g-text)">● Active</span></p>
+      <p>Hospital sync: <span style="color:var(--g-text)">● Live</span></p>
+    </div>
+  </div>
+  <div class="page-content" id="page-records">
+    <h2>📋 Patient Records</h2>
+    <p>Search and view historical patient records.</p>
+    <div class="page-card">
+      <h3>Recent Encounters</h3>
+      <p>Showing all active patients from the ER Dashboard. For full records, integrate with your EHR.</p>
+      <div style="margin-top:12px"><button class="modal-btn primary" onclick="document.getElementById('add-modal').classList.add('active')">+ Add Patient</button></div>
+    </div>
+  </div>
+  <div class="page-content" id="page-files">
+    <h2>🗂 Records</h2>
+    <p>Medical records and documentation.</p>
+    <div class="page-card">
+      <h3>Quick Links</h3>
+      <p>EHR integration • Lab results • Imaging • Discharge summaries</p>
+    </div>
+  </div>
+  <div class="page-content" id="page-meds">
+    <h2>💊 Medications</h2>
+    <p>Medication list and pharmacy interface.</p>
+    <div class="page-card">
+      <h3>Common ED Medications</h3>
+      <p>Morphine • Fentanyl • Ondansetron • Epinephrine • Naloxone • Amiodarone • tPA</p>
+      <p style="font-size:12px;color:var(--n-text3)">Full formulary available in pharmacy system.</p>
+    </div>
+  </div>
+  <div class="page-content" id="page-bays">
+    <h2>🛏 Bay Status</h2>
+    <p>Emergency department bay availability.</p>
+    <div class="page-card">
+      <h3>Bay Overview</h3>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:12px" id="bay-grid">
+        <div class="n-tag green" style="padding:10px">Bay 1 — Available</div>
+        <div class="n-tag gray" style="padding:10px">Bay 2 — Occupied</div>
+        <div class="n-tag gray" style="padding:10px">Bay 3 — Occupied</div>
+        <div class="n-tag green" style="padding:10px">Bay 4 — Available</div>
+        <div class="n-tag gray" style="padding:10px">Bay 5 — Occupied</div>
+        <div class="n-tag green" style="padding:10px">Bay 6 — Available</div>
+        <div class="n-tag gray" style="padding:10px">Bay 7 — Occupied</div>
+        <div class="n-tag green" style="padding:10px">Bay 8 — Available</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ADD PATIENT MODAL -->
+<div class="modal-overlay" id="add-modal" onclick="if(event.target===this)closeAddModal()">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">Add Patient</div>
+    <div class="modal-body">
+      <div class="modal-row">
+        <label>Chief Complaint</label>
+        <input type="text" id="add-complaint" placeholder="e.g. Chest pain, MVA">
+      </div>
+      <div class="modal-row">
+        <label>Age</label>
+        <input type="number" id="add-age" placeholder="45" min="1" max="120">
+      </div>
+      <div class="modal-row">
+        <label>Sex</label>
+        <select id="add-sex"><option value="">—</option><option value="M">Male</option><option value="F">Female</option></select>
+      </div>
+      <div class="modal-row">
+        <label>Severity</label>
+        <select id="add-severity"><option value="low">Low</option><option value="moderate">Moderate</option><option value="high">High</option><option value="critical">Critical</option></select>
+      </div>
+      <div class="modal-row">
+        <label>ETA (minutes)</label>
+        <input type="number" id="add-eta" placeholder="10" min="1" value="10">
+      </div>
+      <div class="modal-row">
+        <label>Notes</label>
+        <input type="text" id="add-notes" placeholder="Optional">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="modal-btn ghost" onclick="closeAddModal()">Cancel</button>
+      <button class="modal-btn primary" onclick="submitAddPatient()">Add Patient</button>
+    </div>
+  </div>
 </div>
 
 <script>
+// ── PAGE NAVIGATION ────────────────────────────────────────────
+const pageConfig={
+  er:{icon:'🏥',title:'Incoming Patients',desc:'Real-time ambulance transport tracking — Vancouver General Hospital, ED Unit A'},
+  paramedic:{icon:'🚑',title:'Paramedic Feed',desc:'Live paramedic reports and radio traffic'},
+  alerts:{icon:'⚡',title:'Live Alerts',desc:'Critical alerts requiring attention'},
+  pipeline:{icon:'📊',title:'Agent Pipeline',desc:'AI workflow status'},
+  records:{icon:'📋',title:'Patient Records',desc:'Search and manage patient records'},
+  files:{icon:'🗂',title:'Records',desc:'Medical records and documentation'},
+  meds:{icon:'💊',title:'Medications',desc:'Formulary and pharmacy'},
+  bays:{icon:'🛏',title:'Bay Status',desc:'ED bay availability'},
+};
+let currentPage='er';
+
+function goPage(page,el){
+  currentPage=page;
+  document.querySelectorAll('.sb-item').forEach(i=>i.classList.remove('active'));
+  (el||document.querySelector(`.sb-item[data-page="${page}"]`))?.classList.add('active');
+  document.getElementById('page-er').style.display=page==='er'?'block':'none';
+  document.querySelectorAll('.page-content').forEach(p=>{p.classList.toggle('active',p.id==='page-'+page);});
+  const cfg=pageConfig[page];
+  if(cfg){
+    document.getElementById('page-icon').textContent=cfg.icon;
+    document.getElementById('page-title').textContent=cfg.title;
+    document.getElementById('page-desc').textContent=cfg.desc;
+  }
+  if(page==='alerts')updateAlertsList();
+}
+
+function openAddModal(){
+  document.getElementById('add-modal').classList.add('active');
+  document.getElementById('add-complaint').value='';
+  document.getElementById('add-age').value='';
+  document.getElementById('add-sex').value='';
+  document.getElementById('add-severity').value='moderate';
+  document.getElementById('add-eta').value='10';
+  document.getElementById('add-notes').value='';
+}
+function closeAddModal(){document.getElementById('add-modal').classList.remove('active');}
+async function submitAddPatient(){
+  const res=await fetch('/api/encounters',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      chiefComplaint:document.getElementById('add-complaint').value.trim()||'Manual entry',
+      age:parseInt(document.getElementById('add-age').value)||null,
+      sex:document.getElementById('add-sex').value||null,
+      severity:document.getElementById('add-severity').value,
+      etaMinutes:parseInt(document.getElementById('add-eta').value)||10,
+      notes:document.getElementById('add-notes').value.trim(),
+    }),
+  });
+  if(!res.ok){alert('Failed to add patient');return;}
+  const {encounter}=await res.json();
+  mergeEnc(encounter);
+  renderTable();
+  updateMetrics();
+  closeAddModal();
+  goPage('er');
+  openPatient(encounter.encounterId);
+}
+
+function updateAlertsList(){
+  const unacked=patients.filter(p=>!ackedMap[p.id]);
+  const el=document.getElementById('alerts-list');
+  const countEl=document.getElementById('alerts-count');
+  if(!el)return;
+  if(countEl)countEl.textContent=unacked.length;
+  if(unacked.length===0){el.innerHTML='<p style="color:var(--n-text3)">No pending alerts.</p>';return;}
+  el.innerHTML=unacked.map(p=>`<p><span class="n-tag ${svCfg[p.severity]?.tag||'gray'}">${p.id}</span> ${p.complaint} — ${p.eta} min ETA</p>`).join('');
+}
+
 const patients=[
   {id:'ENC-2847',ambulance:'AMB-04',eta:3,age:62,sex:'M',complaint:'Chest Pain / STEMI',severity:'critical',category:'Cardiac',conscious:true,breathing:'labored',vitals:{hr:112,bp:'92/60',spo2:91,rr:22,temp:37.2,gcs:14},notes:'Onset 45 min ago. Diaphoretic. Hx of MI 2019.',symptoms:['Chest Pain','Diaphoresis','SOB'],acked:false,actions:[{type:'urgent',title:'Activate cath lab immediately',detail:'STEMI pattern on field ECG'},{type:'urgent',title:'Prepare dual antiplatelet therapy',detail:'Aspirin + Ticagrelor'},{type:'warn',title:'Trauma bay on standby',detail:'Patient may deteriorate en route'},{type:'info',title:'Cardiology consult required',detail:'Contact on-call cardiologist now'}],timeline:[{time:'09:42',event:'Intake received',detail:'ENC-2847 by AMB-04',type:'info'},{time:'09:43',event:'Risk scored: CRITICAL',detail:'STEMI indicators detected',type:'critical'},{time:'09:45',event:'Vitals updated',detail:'HR 112, BP 92/60, SpO2 91%',type:'warn'}]},
   {id:'ENC-2846',ambulance:'AMB-07',eta:6,age:34,sex:'F',complaint:'MVA — Head Trauma',severity:'critical',category:'Trauma',conscious:false,breathing:'assisted',vitals:{hr:98,bp:'140/88',spo2:94,rr:18,temp:36.8,gcs:8},notes:'Unrestrained passenger. Loss of consciousness at scene.',symptoms:['Head Trauma','Unconscious'],acked:false,actions:[{type:'urgent',title:'Prepare CT — head/C-spine',detail:'GCS 8, high-risk mechanism'},{type:'urgent',title:'Trauma team activation',detail:'Level 1 criteria met'},{type:'warn',title:'Neurosurgery on standby',detail:'Possible intracranial bleed'}],timeline:[{time:'09:38',event:'Intake received',detail:'ENC-2846 by AMB-07',type:'info'},{time:'09:43',event:'GCS updated',detail:'Dropped 10→8',type:'critical'}]},
@@ -507,8 +719,8 @@ function updateMetrics(){
 
 function updateClock(){const n=new Date();document.getElementById('clock').textContent=`${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}:${String(n.getSeconds()).padStart(2,'0')}`}
 
-// SERVER
-const SERVER='https://pulse-production-3ea1.up.railway.app';
+// SERVER — use same origin so it works locally and in production
+const SERVER=window.location.origin;
 const sock=io(SERVER,{query:{role:'hospital'}});
 sock.on('connect',()=>{
   const el=document.getElementById('live-ind');
@@ -522,9 +734,10 @@ sock.on('disconnect',()=>{
   el.querySelector('.live-dot').style.background='var(--gy-text)';
   el.lastChild.textContent=' Disconnected';
 });
-sock.on('encounters:init',(inc)=>{inc.forEach(mergeEnc);renderTable();updateMetrics()});
+sock.on('initial:load',(inc)=>{inc.forEach(mergeEnc);renderTable();updateMetrics();updateAlertsList()});
+sock.on('encounters:init',(inc)=>{inc.forEach(mergeEnc);renderTable();updateMetrics();updateAlertsList()});
 sock.on('patient:update',(enc)=>{
-  mergeEnc(enc);renderTable();updateMetrics();
+  mergeEnc(enc);renderTable();updateMetrics();updateAlertsList();
   if(selId===enc.encounterId)openPatient(enc.encounterId);
 });
 
@@ -538,7 +751,7 @@ function mergeEnc(enc){
   ackedMap[enc.encounterId]=mapped.acked;
 }
 
-setInterval(updateClock,1000);updateClock();renderTable();updateMetrics();
+setInterval(updateClock,1000);updateClock();renderTable();updateMetrics();updateAlertsList();
 </script>
 </body>
 </html>

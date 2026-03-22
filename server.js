@@ -13,6 +13,10 @@ app.use(cors());
 app.use(express.json({ limit: '20mb' }));
 app.use(express.static('public'));
 
+// Convenience redirects for common URLs
+app.get('/hospital.html', (req, res) => res.redirect('/pulsebridge-hospital-dashboard.html'));
+app.get('/scanner.html', (req, res) => res.redirect('/pulsebridge-live-scanner.html'));
+
 // ── IN-MEMORY STORE (replace with Cassandra for production) ──
 const encounters = new Map();
 
@@ -74,6 +78,33 @@ app.post('/api/acknowledge/:id', (req, res) => {
 // GET /api/encounters — initial load for hospital dashboard
 app.get('/api/encounters', (req, res) => {
   res.json([...encounters.values()].filter(e => e.status === 'active'));
+});
+
+// POST /api/encounters — manually add a patient (from hospital dashboard)
+app.post('/api/encounters', (req, res) => {
+  const { chiefComplaint, age, sex, severity, etaMinutes, notes } = req.body;
+  const encounter = {
+    encounterId:      'ENC-' + uuid().slice(0, 6).toUpperCase(),
+    ambulanceId:      req.body.ambulanceId || 'AMB-MANUAL',
+    status:           'active',
+    createdAt:        new Date().toISOString(),
+    acknowledged:     false,
+    vitalsHistory:    [],
+    vitals:           req.body.vitals || {},
+    severity:         severity || 'moderate',
+    recommendations:  [],
+    etaMinutes:       etaMinutes ?? 10,
+    patient:          {
+      chiefComplaint: chiefComplaint || 'Manual entry',
+      age:            age ?? null,
+      sex:            sex || null,
+      notes:          notes || '',
+    },
+  };
+  encounters.set(encounter.encounterId, encounter);
+  io.emit('patient:update', encounter);
+  console.log(`[NEW]     ${encounter.encounterId} added manually — ${chiefComplaint || 'Manual entry'}`);
+  res.json({ ok: true, encounter });
 });
 
 // POST /api/vision — proxy Claude Vision call server-side
