@@ -283,9 +283,21 @@ body{background:var(--n-bg);color:var(--n-text);font-family:var(--font);font-siz
           Patient Context
         </div>
         <div class="ctx-grid">
-          <div class="ctx-field"><div class="ctx-lbl">Chief Complaint</div><input type="text" id="f-complaint" placeholder="e.g. Chest pain…"></div>
-          <div class="ctx-field"><div class="ctx-lbl">ETA (minutes)</div><input type="number" id="f-eta" placeholder="8" min="1" max="90"></div>
+          <div class="ctx-field full"><div class="ctx-lbl">Chief Complaint</div><input type="text" id="f-complaint" placeholder="e.g. Chest pain…"></div>
           <div class="ctx-field full"><div class="ctx-lbl">Notes / History</div><textarea id="f-notes" placeholder="Medications, history, mechanism of injury…"></textarea></div>
+        </div>
+      </div>
+
+      <!-- GPS -->
+      <div class="n-section">
+        <div class="n-section-title">
+          <svg viewBox="0 0 13 13" fill="none"><circle cx="6.5" cy="6.5" r="5" stroke="currentColor" stroke-width="1.2"/><circle cx="6.5" cy="6.5" r="1.5" fill="currentColor"/><path d="M6.5 1.5v2M6.5 9v2M1.5 6.5h2M9 6.5h2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+          GPS Tracking
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="n-btn green" id="btn-gps" onclick="startGPS()">📍 Start GPS</button>
+          <button class="n-btn" id="btn-gps-stop" onclick="stopGPS()" disabled>Stop</button>
+          <span style="font-size:12px;color:var(--n-text3)" id="gps-status-inline">Not started</span>
         </div>
       </div>
 
@@ -335,6 +347,18 @@ body{background:var(--n-bg);color:var(--n-text);font-family:var(--font);font-siz
         <div class="pp-prop">
           <span class="pp-key">Complaint</span>
           <span class="pp-val muted" id="pi-complaint">—</span>
+        </div>
+        <div class="pp-prop">
+          <span class="pp-key">ETA</span>
+          <span class="pp-val muted" id="pi-eta">—</span>
+        </div>
+        <div class="pp-prop">
+          <span class="pp-key">Distance</span>
+          <span class="pp-val muted" id="pi-dist">—</span>
+        </div>
+        <div class="pp-prop">
+          <span class="pp-key">GPS</span>
+          <span class="pp-val muted" id="gps-status">Not started</span>
         </div>
       </div>
 
@@ -395,6 +419,49 @@ sock.on('connect',()=>log('Connected to Pulse server','ok'));
 sock.on('disconnect',()=>log('Server disconnected','warn'));
 sock.on('connect_error',()=>log('Server offline','err'));
 sock.on('patient:acked',({encounterId:id})=>{if(id===encId)log('Hospital acknowledged ✓','ok')});
+
+// GPS TRACKING
+let gpsWatcher=null
+
+function startGPS(){
+  if(!navigator.geolocation){log('GPS not available','warn');return}
+  document.getElementById('btn-gps').disabled=true
+  document.getElementById('btn-gps-stop').disabled=false
+  document.getElementById('gps-status-inline').textContent='Acquiring…'
+  gpsWatcher=navigator.geolocation.watchPosition(pos=>{
+    const{latitude:lat,longitude:lng,accuracy}=pos.coords
+    const acc=`GPS active · ±${Math.round(accuracy)}m`
+    document.getElementById('gps-status').textContent=acc
+    document.getElementById('gps-status').className='pp-val ok'
+    document.getElementById('gps-status-inline').textContent=acc
+    fetch(SERVER+'/location',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({encounterId:encId,ambulanceId:'AMB-04',lat,lng})
+    }).then(r=>r.json()).then(d=>{
+      if(d.etaMinutes!=null){
+        document.getElementById('pi-eta').textContent=d.etaMinutes+' min'
+        document.getElementById('pi-eta').className='pp-val'
+        document.getElementById('pi-dist').textContent=d.distanceKm+' km'
+        document.getElementById('pi-dist').className='pp-val'
+        log('GPS → '+d.distanceKm+'km · ETA '+d.etaMinutes+' min','ok')
+      }
+    }).catch(()=>{})
+  },err=>{
+    log('GPS error: '+err.message,'warn')
+    document.getElementById('gps-status').textContent='Error: '+err.message
+    document.getElementById('gps-status-inline').textContent='GPS error'
+  },{enableHighAccuracy:true,maximumAge:5000,timeout:15000})
+  log('GPS tracking started','ok')
+}
+
+function stopGPS(){
+  if(gpsWatcher!=null){navigator.geolocation.clearWatch(gpsWatcher);gpsWatcher=null}
+  document.getElementById('btn-gps').disabled=false
+  document.getElementById('btn-gps-stop').disabled=true
+  document.getElementById('gps-status').textContent='Stopped'
+  document.getElementById('gps-status').className='pp-val muted'
+  document.getElementById('gps-status-inline').textContent='Not started'
+  log('GPS stopped','warn')
+}
 
 async function startCam(){
   try{
@@ -540,7 +607,7 @@ function postServer(vitals,score){
     encounterId:encId,ambulanceId:'AMB-04',
     vitals:{heartRate:vitals.heartRate,bpSystolic:vitals.bpSystolic,bpDiastolic:vitals.bpDiastolic,spo2:vitals.spo2,respiratoryRate:vitals.respiratoryRate,temperature:vitals.temperature,gcs:vitals.gcs},
     severity:score.level,recs:score.recs,
-    etaMinutes:parseInt(document.getElementById('f-eta').value)||8,
+    etaMinutes:parseInt(document.getElementById('pi-eta').textContent)||8,
     patient:{chiefComplaint:document.getElementById('f-complaint').value||'Incoming patient',notes:document.getElementById('f-notes').value,age,sex:sex?sex.charAt(0).toUpperCase():'?'}
   })}).catch(()=>{});
 }

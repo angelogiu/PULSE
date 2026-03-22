@@ -29,7 +29,43 @@ let encounters = {}   // encounterId → encounter object
 let scannerCount = 0
 let dashboardCount = 0
 
-// ── VISION SCAN ENDPOINT ─────────────────────────────────────
+// ── GPS LOCATION + ETA ───────────────────────────────────────
+// Hospital coordinates — update to your actual hospital location
+const HOSPITAL = { lat: 49.2606, lng: -123.1234, name: 'Vancouver General Hospital' }
+const AVG_SPEED_KMH = 50 // average urban ambulance speed
+
+function haversineKm(lat1, lng1, lat2, lng2) {
+  const R = 6371
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLng = (lng2 - lng1) * Math.PI / 180
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLng/2)**2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+}
+
+app.post('/location', (req, res) => {
+  const { encounterId, lat, lng, ambulanceId } = req.body
+  if (!lat || !lng) return res.status(400).json({ error: 'Missing coordinates' })
+
+  const distKm = haversineKm(lat, lng, HOSPITAL.lat, HOSPITAL.lng)
+  const etaMinutes = Math.max(1, Math.round((distKm / AVG_SPEED_KMH) * 60))
+
+  // Update encounter ETA
+  if (encounters[encounterId]) {
+    encounters[encounterId].etaMinutes = etaMinutes
+    encounters[encounterId].location = { lat, lng, updatedAt: new Date().toISOString() }
+    encounters[encounterId].distanceKm = distKm.toFixed(2)
+    io.to('hospital').emit('patient:update', encounters[encounterId])
+  }
+
+  // Also broadcast a dedicated location event
+  io.to('hospital').emit('ambulance:location', {
+    encounterId, ambulanceId, lat, lng, etaMinutes,
+    distanceKm: distKm.toFixed(2)
+  })
+
+  console.log(`[GPS] ${ambulanceId || encounterId} — ${distKm.toFixed(1)}km away → ETA ${etaMinutes} min`)
+  res.json({ ok: true, etaMinutes, distanceKm: distKm.toFixed(2) })
+})
 // Scanner POSTs a base64 image here — server calls Claude Vision
 // using the ANTHROPIC_API_KEY from .env and returns extracted vitals
 app.post('/scan', async (req, res) => {
