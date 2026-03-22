@@ -76,6 +76,23 @@ TASK 2 — DEMOGRAPHICS: If a patient is visible, estimate age (single number e.
 Respond ONLY with this JSON, no markdown, no explanation:
 {"found":true,"heartRate":null,"bpSystolic":null,"bpDiastolic":null,"spo2":null,"respiratoryRate":null,"temperature":null,"gcs":null,"estimatedAge":null,"estimatedSex":null,"rawText":"","notes":"brief description","confidence":{"heartRate":"high","bpSystolic":"high","spo2":"high","respiratoryRate":"med","temperature":"med","gcs":"low","demographics":"low"}}`
 
+function safeParseJSON(text) {
+  try {
+    // Strip markdown fences and whitespace
+    const clean = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim()
+    return JSON.parse(clean)
+  } catch {
+    // Try to extract the first { ... } block
+    const match = text.match(/\{[\s\S]*\}/)
+    if (match) {
+      try { return JSON.parse(match[0]) } catch {}
+    }
+    // Return a safe fallback
+    console.error('[SCAN] JSON parse failed, raw text:', text.slice(0, 200))
+    return { found: false, notes: 'JSON parse error', heartRate: null, spo2: null }
+  }
+}
+
 app.post('/scan', async (req, res) => {
   const { imageBase64, imageMime } = req.body
   if (!imageBase64) return res.status(400).json({ error: 'No image provided' })
@@ -91,9 +108,9 @@ app.post('/scan', async (req, res) => {
     let result
 
     if (geminiKey) {
-      // ── Gemini 1.5 Flash ────────────────────────────────────
-      const r = await fetch(
-        `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
+      // ── Gemini 2.5 Flash ────────────────────────────────────
+    const r = await fetch(
+      `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -102,14 +119,14 @@ app.post('/scan', async (req, res) => {
               { inline_data: { mime_type: imageMime || 'image/jpeg', data: imageBase64 } },
               { text: VISION_PROMPT }
             ]}],
-            generationConfig: { temperature: 0.1, maxOutputTokens: 800 }
+            generationConfig: { temperature: 0.1, maxOutputTokens: 1024, responseMimeType: 'application/json' }
           })
         }
       )
       const data = await r.json()
       if (!r.ok) throw new Error(data.error?.message || 'Gemini error ' + r.status)
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}'
-      result = JSON.parse(text.replace(/```json|```/g, '').trim())
+      const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}'
+      result = safeParseJSON(raw)
       console.log(`[SCAN] Gemini — HR: ${result.heartRate}, SpO2: ${result.spo2}`)
 
     } else {
@@ -129,7 +146,7 @@ app.post('/scan', async (req, res) => {
       const data = await r.json()
       if (!r.ok) throw new Error(data.error?.message || 'Claude error ' + r.status)
       const text = data.content?.find(b => b.type === 'text')?.text || '{}'
-      result = JSON.parse(text.replace(/```json|```/g, '').trim())
+      result = safeParseJSON(text)
       console.log(`[SCAN] Claude — HR: ${result.heartRate}, SpO2: ${result.spo2}`)
     }
 
