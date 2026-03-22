@@ -2,6 +2,7 @@
 // Express + Socket.IO — real-time bridge between scanner and hospital dashboard
 // Run: node server.js
 
+import 'dotenv/config'
 import express from 'express'
 import http from 'http'
 import { Server as SocketIO } from 'socket.io'
