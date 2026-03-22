@@ -136,7 +136,7 @@ body{background:var(--n-bg);color:var(--n-text);font-family:var(--font);font-siz
 
 /* ─── PROPERTY PANEL (Notion right panel) ── */
 .prop-panel{border-left:1px solid var(--n-border);background:var(--n-bg);display:flex;flex-direction:column;min-height:0;overflow:hidden}
-.pp-scroll{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
+.pp-scroll{flex:1;height:0;min-height:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
 .pp-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:8px;color:var(--n-text3);font-size:13px;text-align:center;padding:32px}
 .pp-empty svg{opacity:.3}
 .pp-header{padding:20px 20px 12px;border-bottom:1px solid var(--n-border)}
@@ -516,7 +516,7 @@ function goPage(page,el){
   currentPage=page;
   document.querySelectorAll('.sb-item').forEach(i=>i.classList.remove('active'));
   (el||document.querySelector(`.sb-item[data-page="${page}"]`))?.classList.add('active');
-  document.getElementById('page-er').style.display=page==='er'?'block':'none';
+  document.getElementById('page-er').style.display=page==='er'?'flex':'none';
   document.querySelectorAll('.page-content').forEach(p=>{p.classList.toggle('active',p.id==='page-'+page);});
   const cfg=pageConfig[page];
   if(cfg){
