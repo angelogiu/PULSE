@@ -29,6 +29,59 @@ let encounters = {}   // encounterId → encounter object
 let scannerCount = 0
 let dashboardCount = 0
 
+// ── VISION SCAN ENDPOINT ─────────────────────────────────────
+// Scanner POSTs a base64 image here — server calls Claude Vision
+// using the ANTHROPIC_API_KEY from .env and returns extracted vitals
+app.post('/scan', async (req, res) => {
+  const { imageBase64, imageMime } = req.body
+  if (!imageBase64) return res.status(400).json({ error: 'No image provided' })
+
+  const apiKey = process.env.ANTHROPIC_API_KEY
+  if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not set in environment' })
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 800,
+        messages: [{
+          role: 'user',
+          content: [
+            {
+              type: 'image',
+              source: { type: 'base64', media_type: imageMime || 'image/jpeg', data: imageBase64 }
+            },
+            {
+              type: 'text',
+              text: `You are an ambulance monitor OCR and patient assessment system. Analyze this image.
+
+TASK 1 — VITALS: If you see a patient monitor or medical screen with numbers, extract all visible values.
+TASK 2 — DEMOGRAPHICS: If a patient is visible, estimate age (single number e.g. 45) and sex (Male/Female). If no patient visible, return null.
+
+Respond ONLY with this JSON, no markdown:
+{"found":true,"heartRate":null,"bpSystolic":null,"bpDiastolic":null,"spo2":null,"respiratoryRate":null,"temperature":null,"gcs":null,"estimatedAge":null,"estimatedSex":null,"rawText":"","notes":"brief description","confidence":{"heartRate":"high","bpSystolic":"high","spo2":"high","respiratoryRate":"med","temperature":"med","gcs":"low","demographics":"low"}}`
+            }
+          ]
+        }]
+      })
+    })
+
+    const data = await response.json()
+    const text = data.content?.find(b => b.type === 'text')?.text || '{}'
+    const result = JSON.parse(text.replace(/```json|```/g, '').trim())
+    res.json(result)
+  } catch (e) {
+    console.error('[SCAN]', e)
+    res.status(500).json({ error: e.message })
+  }
+})
+
 // ── REST: SCANNER POSTS VITALS ───────────────────────────────
 app.post('/intake', (req, res) => {
   const data = req.body
