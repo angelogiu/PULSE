@@ -66,54 +66,75 @@ app.post('/location', (req, res) => {
   console.log(`[GPS] ${ambulanceId || encounterId} — ${distKm.toFixed(1)}km away → ETA ${etaMinutes} min`)
   res.json({ ok: true, etaMinutes, distanceKm: distKm.toFixed(2) })
 })
-// Scanner POSTs a base64 image here — server calls Claude Vision
-// using the ANTHROPIC_API_KEY from .env and returns extracted vitals
+// ── VISION SCAN ENDPOINT ─────────────────────────────────────
+// Supports both Gemini and Claude — set GEMINI_API_KEY or ANTHROPIC_API_KEY in Railway variables
+// Gemini takes priority if both are set
+const VISION_PROMPT = `You are an ambulance monitor OCR and patient assessment system. Analyze this image.
+TASK 1 — VITALS: If you see a patient monitor or medical screen with numbers, extract all visible values.
+TASK 2 — DEMOGRAPHICS: If a patient is visible, estimate age (single number e.g. 45) and sex (Male/Female). If no patient visible, return null.
+Respond ONLY with this JSON, no markdown, no explanation:
+{"found":true,"heartRate":null,"bpSystolic":null,"bpDiastolic":null,"spo2":null,"respiratoryRate":null,"temperature":null,"gcs":null,"estimatedAge":null,"estimatedSex":null,"rawText":"","notes":"brief description","confidence":{"heartRate":"high","bpSystolic":"high","spo2":"high","respiratoryRate":"med","temperature":"med","gcs":"low","demographics":"low"}}`
+
 app.post('/scan', async (req, res) => {
   const { imageBase64, imageMime } = req.body
   if (!imageBase64) return res.status(400).json({ error: 'No image provided' })
 
-  const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not set in environment' })
+  const geminiKey = process.env.GEMINI_API_KEY
+  const claudeKey = process.env.ANTHROPIC_API_KEY
+
+  if (!geminiKey && !claudeKey) {
+    return res.status(500).json({ error: 'No API key found — set GEMINI_API_KEY or ANTHROPIC_API_KEY in Railway Variables' })
+  }
 
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 800,
-        messages: [{
-          role: 'user',
-          content: [
-            {
-              type: 'image',
-              source: { type: 'base64', media_type: imageMime || 'image/jpeg', data: imageBase64 }
-            },
-            {
-              type: 'text',
-              text: `You are an ambulance monitor OCR and patient assessment system. Analyze this image.
+    let result
 
-TASK 1 — VITALS: If you see a patient monitor or medical screen with numbers, extract all visible values.
-TASK 2 — DEMOGRAPHICS: If a patient is visible, estimate age (single number e.g. 45) and sex (Male/Female). If no patient visible, return null.
+    if (geminiKey) {
+      // ── Gemini 1.5 Flash ────────────────────────────────────
+      const r = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [
+              { inline_data: { mime_type: imageMime || 'image/jpeg', data: imageBase64 } },
+              { text: VISION_PROMPT }
+            ]}],
+            generationConfig: { temperature: 0.1, maxOutputTokens: 800 }
+          })
+        }
+      )
+      const data = await r.json()
+      if (!r.ok) throw new Error(data.error?.message || 'Gemini error ' + r.status)
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}'
+      result = JSON.parse(text.replace(/```json|```/g, '').trim())
+      console.log(`[SCAN] Gemini — HR: ${result.heartRate}, SpO2: ${result.spo2}`)
 
-Respond ONLY with this JSON, no markdown:
-{"found":true,"heartRate":null,"bpSystolic":null,"bpDiastolic":null,"spo2":null,"respiratoryRate":null,"temperature":null,"gcs":null,"estimatedAge":null,"estimatedSex":null,"rawText":"","notes":"brief description","confidence":{"heartRate":"high","bpSystolic":"high","spo2":"high","respiratoryRate":"med","temperature":"med","gcs":"low","demographics":"low"}}`
-            }
-          ]
-        }]
+    } else {
+      // ── Claude Vision ───────────────────────────────────────
+      const r = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': claudeKey, 'anthropic-version': '2023-06-01' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 800,
+          messages: [{ role: 'user', content: [
+            { type: 'image', source: { type: 'base64', media_type: imageMime || 'image/jpeg', data: imageBase64 } },
+            { type: 'text', text: VISION_PROMPT }
+          ]}]
+        })
       })
-    })
+      const data = await r.json()
+      if (!r.ok) throw new Error(data.error?.message || 'Claude error ' + r.status)
+      const text = data.content?.find(b => b.type === 'text')?.text || '{}'
+      result = JSON.parse(text.replace(/```json|```/g, '').trim())
+      console.log(`[SCAN] Claude — HR: ${result.heartRate}, SpO2: ${result.spo2}`)
+    }
 
-    const data = await response.json()
-    const text = data.content?.find(b => b.type === 'text')?.text || '{}'
-    const result = JSON.parse(text.replace(/```json|```/g, '').trim())
     res.json(result)
   } catch (e) {
-    console.error('[SCAN]', e)
+    console.error('[SCAN]', e.message)
     res.status(500).json({ error: e.message })
   }
 })
