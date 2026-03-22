@@ -509,7 +509,7 @@ async function callVision(b64){
     const res=await fetch(SERVER+'/scan',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({imageBase64:b64,imageMime:'image/jpeg'})
+      body:JSON.stringify({imageBase64:b64,imageMime:'image/jpeg',encounterId:encId})
     });
     if(!res.ok){const e=await res.json();log('Scan error: '+(e.error||res.status),'err');setStatus('live','Live');return}
     const r=await res.json();
